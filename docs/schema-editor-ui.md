@@ -481,6 +481,6 @@ The M1 walkthrough below needs no hand-edited JSON and was exercised against the
 5. Create a concrete definition, compose the abstract one, and add an enum
    field.
 6. Inspect the effective view and confirm origin badges.
-7. Create a cycle, see the exact error, and remove the composition.
+7. Delete the enum value used by a default, see the exact error, and restore it.
 8. Declare an event with a typed payload.
 9. Save, close, reopen, and confirm the same definitions and validation.

@@ -97,7 +97,7 @@ The sample loads, resolves defaults, and reports errors for deliberately broken 
 8. Create concrete `gameA:button` composing both, with `label`, `enabled`, a `style` enum field, and a `pressed` event.
 9. Create `gameA:elevatorButton` composing `gameA:button` and override the `label` default.
 10. Inspect `gameA:button` effective fields/events and their origins.
-11. Introduce a cyclic composition or a duplicate field, confirm validation points at the field, then fix it.
+11. Delete the `primary` enum value used by `gameA:button.style`, confirm validation jumps to the field, then restore it.
 12. Save, close and reopen the workspace, and confirm the schema reloads with the same result.
 
 **Done when**
