@@ -1074,7 +1074,7 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
             >
               <span className="enum-icon" aria-hidden="true">◇</span>
               <span className="nav-label">{name}</span>
-              <span className="nav-count">{state.doc.enums?.[name]?.values.length ?? 0}</span>
+              <span className="nav-count">{state.doc.enums?.[name]?.values?.length ?? 0}</span>
             </button>
           ))}
           {canWrite && newEnumName === null && (
@@ -2064,6 +2064,7 @@ function EnumEditor(props: {
   commitNewValue: () => void
   onMoveValue: (direction: -1 | 1, value: string) => void
 }) {
+  const values = Array.isArray(props.enumDef.values) ? props.enumDef.values : []
   return (
     <article className="definition-workspace enum-workspace">
       <header className="definition-header">
@@ -2078,7 +2079,7 @@ function EnumEditor(props: {
             <span className="qualified-id">enum</span>
           </div>
           <div className="definition-controls">
-            <span className="badge concrete">{props.enumDef.values.length} values</span>
+            <span className="badge concrete">{values.length} values</span>
             {props.canEdit && (
               <button type="button" className="button ghost tiny danger-text" onClick={props.onDelete}>Delete enum</button>
             )}
@@ -2097,10 +2098,10 @@ function EnumEditor(props: {
         <table className="data-table">
           <thead><tr><th>Value</th><th aria-label="Actions" /></tr></thead>
           <tbody>
-            {props.enumDef.values.length === 0 && (
+            {values.length === 0 && (
               <tr><td colSpan={2} className="table-empty">No values yet.</td></tr>
             )}
-            {props.enumDef.values.map((value, index) => (
+            {values.map((value, index) => (
               <tr key={value}>
                 <td>
                   <CommitInput value={value} disabled={!props.canEdit} onCommit={(next) => props.onRenameValue(value, next)} />
