@@ -1,6 +1,6 @@
 # Schema Editor UI Concept
 
-Status: design proposal for M1. No implementation yet.
+Status: implemented for M1. This document records the shipped UI concept; later changes should update the roadmap and technical decisions.
 
 The schema editor is Tenon's first editor surface. It is where the vocabulary is
 authored; the scene editor consumes that vocabulary later. Usability is the
@@ -446,9 +446,9 @@ Not in M1:
 - Per-definition custom UI.
 - Field constraints and editor hints beyond defaults and documentation.
 
-## Proposed decisions
+## Decisions shipped in M1
 
-These are the choices to confirm before implementation:
+These choices are implemented in the M1 plugin:
 
 1. **Project hub placement.** A primary activity-bar panel titled **Tenon**,
    with the New Schema action as its first action. Recommended over a secondary
@@ -471,7 +471,7 @@ These are the choices to confirm before implementation:
 
 ## MVP acceptance walkthrough
 
-The UI concept is settled when this walkthrough needs no hand-edited JSON:
+The M1 walkthrough below needs no hand-edited JSON and was exercised against the deployed plugin:
 
 1. Create a schema with **New Schema** from the command palette, then open it
    from the explorer.
