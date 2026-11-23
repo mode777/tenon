@@ -66,7 +66,7 @@ The sample loads, resolves defaults, and reports errors for deliberately broken 
 **Build**
 
 - Tenon Exo plugin scaffold: manifest, controller, project hub panel, and schema editor frame.
-- `tenon.schema` new-file template, exposed by the shell as **New Schema** in the command palette and New File menu.
+- `tenon.new-schema` command targeting the project hub; exposed in the command palette and as the panel's New Schema action.
 - Project hub panel: schema list and a New Schema action.
 - Open existing schema bundles from the project hub or the Exo file tree.
 - Schema editor frame, designed for usability (see [Schema editor UI](schema-editor-ui.md)):
@@ -89,20 +89,19 @@ The sample loads, resolves defaults, and reports errors for deliberately broken 
 
 1. Open the M0 sample project in the Exo shell and enable the Tenon plugin.
 2. Run **New Schema** from the command palette; name it `gameA.schema.json`.
-3. Open the new schema from the explorer.
-4. Set namespace `gameA` and version `1.0.0`.
-5. Create abstract `gameA:renderable` with `visible` and `castShadows`.
-6. Create abstract `gameA:damageable` with `health` and a `damaged` event with an `amount` payload.
-7. Create enum `ButtonStyle` with `primary` and `secondary`.
-8. Create concrete `gameA:button` composing both, with `label`, `enabled`, a `style` enum field, and a `pressed` event.
-9. Create `gameA:elevatorButton` composing `gameA:button` and override the `label` default.
-10. Inspect `gameA:button` effective fields/events and their origins.
-11. Delete the `primary` enum value used by `gameA:button.style`, confirm validation jumps to the field, then restore it.
-12. Save, close and reopen the workspace, and confirm the schema reloads with the same result.
+3. Set namespace `gameA` and version `1.0.0`.
+4. Create abstract `gameA:renderable` with `visible` and `castShadows`.
+5. Create abstract `gameA:damageable` with `health` and a `damaged` event with an `amount` payload.
+6. Create enum `ButtonStyle` with `primary` and `secondary`.
+7. Create concrete `gameA:button` composing both, with `label`, `enabled`, a `style` enum field, and a `pressed` event.
+8. Create `gameA:elevatorButton` composing `gameA:button` and override the `label` default.
+9. Inspect `gameA:button` effective fields/events and their origins.
+10. Delete the `primary` enum value used by `gameA:button.style`, confirm validation jumps to the field, then restore it.
+11. Save, close and reopen the workspace, and confirm the schema reloads with the same result.
 
 **Done when**
 
-- New Schema is available from the command palette and New File menu through the shell template, and as a create-and-open action in the project hub.
+- The New Schema command is available from the command palette and the project hub, creates a valid bundle, and opens it.
 - The schema editor round-trips the schema format without data loss.
 - Definitions, abstract flags, composition, fields, enums, defaults, and event payloads are editable.
 - Effective fields and events match composition and default rules.
@@ -291,7 +290,7 @@ The sample loads, resolves defaults, and reports errors for deliberately broken 
 A new user must be able to:
 
 1. Install the Tenon plugin in the Exo shell and open the sample workspace.
-2. Create a schema with the New Schema action, using abstract and concrete definitions and composition.
+2. Create a schema with the New Schema command, using abstract and concrete definitions and composition.
 3. Place and edit entities in a level.
 4. Create a reusable scene.
 5. Instance it and override a promoted field.

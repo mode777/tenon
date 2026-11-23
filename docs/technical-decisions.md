@@ -692,12 +692,12 @@ declares these file editors:
 
 The controller is `plugin.html`; every entry stays inside the plugin root.
 
-The plugin also contributes one project-level panel and one new-file template:
+The plugin also contributes one project-level panel and one command:
 
 | Contribution | Id | Purpose |
 |---|---|---|
 | Panel | `tenon.project` | Project hub: schema list and creation actions |
-| New-file template | `tenon.schema` | **New Schema** in the shell's New File menu and command palette, labelled **Schema** |
+| Command | `tenon.new-schema` | **New Schema** in the command palette; targets the project hub |
 
 - Every file editor uses `rendering: "frame"`. The default hidden rendering is for
   the controller and headless transforms, not for these visual editors.
@@ -706,9 +706,9 @@ The plugin also contributes one project-level panel and one new-file template:
 - A level is a scene document used as the top-level world, so it reuses the scene
   editor and adds level-only controls. There is no separate level format.
 - The controller page registers the declared file editors, the project panel, and
-  the `tenon.schema` new-file template, then is removed. Each open document gets
-  its own handler frame with its own buffer, selection, undo/redo stack, and
-  validation state. Frames do not share mutable state.
+  the `tenon.new-schema` command, then is removed. Each open document gets its own
+  handler frame with its own buffer, selection, undo/redo stack, and validation
+  state. Frames do not share mutable state.
 - Format editors are per format, never per definition. Adding a concrete
   definition changes schema data only; it adds no page, glob, or editor code.
 - The shell owns the tab strip, breadcrumbs, Save/Save All, dirty indicators,
@@ -743,13 +743,13 @@ The plugin also contributes one project-level panel and one new-file template:
   permissions, and editor globs; adding a glob re-prompts.
 - New authoring documents are created only through shell-owned dialogs; the plugin
   never writes them directly.
-- The New Schema action has two paths. The `tenon.schema` manifest template is
-  available from the shell's New File menu and command palette and creates a schema
-  bundle without a plugin frame. The project hub's New Schema button calls
-  `requestNewFile` while the panel is focused, then opens the new file.
-- Exo requires a focused frame for `requestNewFile`. A command delivered to a
-  revealed panel does not own DOM focus, so New Schema is a manifest new-file
-  template plus a focused panel action rather than a panel-target command.
+- New Schema is a command targeting the project hub. The shell reveals the panel,
+  delivers the command, and treats the live invocation as user activation, so the
+  panel may call `requestNewFile` even without owning DOM focus. The panel then
+  calls `openFile`. The panel's New Schema button uses the same request path.
+- This requires Exo 0.8.0 or newer for command-scoped user activation. The manifest
+  declares that minimum range; the command still obeys permission, write, size,
+  rate, and shell-dialog checks.
 - Builtin `basic3d` bundles are packaged with the plugin, not written into the
   workspace (TD-25). The schema editor exposes them read-only; the engine ships
   the same versions.
@@ -779,8 +779,8 @@ in [schema-editor-ui.md](schema-editor-ui.md).
 
 - The schema editor is a DOM-only frame; it does not load three.js or scene code
   (TD-15).
-- The plugin contributes the `tenon.project` panel and `tenon.schema` new-file
-  template (TD-26).
+- The plugin contributes the `tenon.project` panel and `tenon.new-schema` command
+  (TD-26).
 - M1 uses one schema bundle plus builtin `basic3d` as the unit of work. The
   project editor, import-map editing, and remote bundle UI arrive with the scene
   editor (M2).

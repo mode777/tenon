@@ -126,10 +126,18 @@ export function ProjectHub({ client }: { client: ViewClient }) {
 
   useEffect(() => {
     void refresh()
+    const offCommand = client.onCommand(async (invocation) => {
+      if (invocation.command !== 'tenon.new-schema') {
+        return { ok: false, message: `Unknown Tenon command: ${invocation.command}` }
+      }
+      return createSchema()
+    })
     const offDispose = client.onDispose(() => {
+      offCommand()
       offDispose()
     })
     return () => {
+      offCommand()
       offDispose()
     }
     // The panel is a singleton frame; the client is stable for its lifetime.

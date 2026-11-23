@@ -47,7 +47,7 @@ still planned; do not create them just to "verify" a doc.
 - Before shipping: `npm test`, `npm run typecheck`, and `npm run build`.
 - The schema editor must not read or write `exo.json` or `.exo/**`, and must not write
   another workspace file. Saves go through `onSaveRequest`; new files go through the
-  shell template or `requestNewFile`.
+  New Schema command and shell-owned `requestNewFile` dialog.
 
 ## Model invariants (do not contradict)
 
@@ -96,10 +96,10 @@ still planned; do not create them just to "verify" a doc.
 - Format editors are per format, never per definition. Adding a definition changes
   schema data and adds no page, glob, or editor code.
 - The project hub panel (`tenon.project`) is the only shell panel. It is
-  project-level and hosts the New Schema action; the plugin also contributes the
-  `tenon.schema` new-file template. Per-document tools stay in editor frames.
-- New Schema is a shell new-file template because Exo requires a focused frame for
-  `requestNewFile`; the project hub button is the create-and-open path.
+  project-level, hosts the New Schema action, and is the target of the
+  `tenon.new-schema` command. Per-document tools stay in editor frames.
+- New Schema requires Exo 0.8.0+ command-scoped user activation; the panel may call
+  `requestNewFile` during its live command invocation without owning DOM focus.
 - The schema editor is M1. It is a DOM-only frame; the scene editor adds three.js in
   M2.
 - Each open document is its own frame with its own buffer, selection, undo/redo, and

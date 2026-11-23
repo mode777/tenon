@@ -77,28 +77,40 @@ The plugin contributes one project-level panel, `tenon.project`, titled
 The project hub is not document-scoped. Per-document hierarchy, inspector,
 palette, and validation stay inside the editor frames.
 
-### New Schema action
+### New Schema command
 
-The plugin contributes a manifest new-file template, `tenon.schema`, labelled
-**Schema**. Exo exposes it as **New Schema** in the command palette and under
-**New File → Tenon → Schema**. The project hub also has a **New Schema** button.
+The plugin registers `tenon.new-schema` with the Exo shell:
 
-There are two creation paths because Exo requires a visible, focused plugin frame
-for `requestNewFile`:
+```text
+id:      tenon.new-schema
+title:   New Schema
+category: Tenon
+target:  { kind: "panel", id: "tenon.project" }
+menus:   ["commandPalette"]
+```
 
-1. **Shell template.** Choose **New Schema** from the command palette or
-   **New File → Tenon → Schema**. The shell opens its Save As dialog and writes
-   the template without a plugin frame. The new file is not auto-opened; open it
-   from the explorer.
-2. **Project hub.** Open the Tenon panel and press **New Schema**. The panel is
-   focused, calls `requestNewFile`, then `openFile`; the schema editor opens.
+Flow:
 
-Exo has no panel-target command that can create a file from the command palette:
-the panel is revealed but does not own DOM focus, so `requestNewFile` is denied.
-The manifest template is the shell-native creation path; the hub button is the
-create-and-open path.
+1. The user invokes **New Schema** from the command palette or presses the
+   project hub's **New Schema** button.
+2. The shell reveals the Tenon panel and delivers `shell/command`.
+3. While the invocation is live, Exo treats the panel as user-activated even if
+   the panel iframe does not own DOM focus. The panel calls `requestNewFile` with
+   the minimal schema template and a suggested name in `/schemas`.
+4. The shell owns the name/location dialog and writes the file.
+5. The panel calls `openFile(path)`; the schema editor opens the new bundle and
+   focuses the header.
+6. The command returns `{ ok: true }`.
 
-Both paths use the same minimal template:
+This requires **Exo 0.8.0+**, which adds command-scoped user activation for
+`requestNewFile` and the workspace picker. All existing permissions, write
+checks, size limits, rate limits, and shell-owned dialogs still apply.
+
+The command never writes the file itself and never edits `project.json`. M1
+treats the schema bundle as standalone; project import status and editing arrive
+with M2.
+
+The initial template is intentionally boring:
 
 ```json
 {
@@ -110,13 +122,8 @@ Both paths use the same minimal template:
 }
 ```
 
-The shell owns the name/location dialog and the write. The plugin never writes
-the file itself and never edits `project.json`. M1 treats the schema bundle as
-standalone; project import status and editing arrive with M2.
-
-If the shell lacks `requestNewFile` or `openFile` support, the hub disables its
-button and explains which shell capability is missing. The manifest template
-appears only on shells that support new-file templates.
+The user edits the identity in the bundle header. No extra creation modal is
+needed.
 
 ## Layout
 
@@ -418,7 +425,7 @@ Initial rules:
 
 Included:
 
-- Exo plugin scaffold, project hub panel, and the `tenon.schema` new-file template.
+- Exo plugin scaffold, project hub panel, and the `tenon.new-schema` command.
 - Open, edit, save, reload, and validate a schema bundle.
 - Bundle header: `id`, `namespace`, `version`.
 - Definitions: create, rename, delete, abstract/concrete, documentation.
@@ -451,30 +458,28 @@ Not in M1:
 These choices are implemented in the M1 plugin:
 
 1. **Project hub placement.** A primary activity-bar panel titled **Tenon**,
-   with the New Schema action as its first action. Recommended over a secondary
-   panel or a file-only command.
-2. **Creation behavior.** New Schema uses the minimal template with default
-   namespace and version. The hub path opens the bundle; the shell template path
-   leaves it in the explorer to open. The header is the first edit after opening.
-   Recommended for speed and for respecting Exo's focused-frame creation rule.
+   with the New Schema action as its first action. Chosen over a secondary panel
+   or a file-only command.
+2. **Creation behavior.** New Schema creates a bundle with default namespace and
+   version, opens it, and focuses the header. The panel button and command use the
+   same path. No namespace prompt before the shell file dialog.
 3. **Layout.** Three panes (sidebar, definition, inspector) with the inspector
-   collapsing on narrow frames. Recommended over a two-pane table-only layout
-   because field metadata is too rich for inline-only editing.
+   collapsing on narrow frames. Chosen over a two-pane table-only layout because
+   field metadata is too rich for inline-only editing.
 4. **Field order.** Preserve JSON object order and offer move up/down; defer
    drag-and-drop. Recommended for MVP.
 5. **Effective view.** A third tab beside Fields and Events, plus origin badges
-   in the normal tables. Recommended because composition is the concept that
-   needs teaching.
+   in the normal tables. Chosen because composition is the concept that needs
+   teaching.
 6. **Project scope.** M1 lists schemas in the project hub but does not edit
-   `project.json` imports; import status arrives with M2. Recommended to keep the
-   first MVP focused.
+   `project.json` imports; import status arrives with M2. Chosen to keep the first
+   MVP focused.
 
 ## MVP acceptance walkthrough
 
 The M1 walkthrough below needs no hand-edited JSON and was exercised against the deployed plugin:
 
-1. Create a schema with **New Schema** from the command palette, then open it
-   from the explorer.
+1. Create a schema with **New Schema** from the command palette.
 2. Set the bundle identity.
 3. Create an abstract definition and two fields.
 4. Create an enum with two values.

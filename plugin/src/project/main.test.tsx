@@ -6,10 +6,11 @@ import type { ViewClient } from '@exo/plugin-sdk'
 import { ProjectHub } from './main'
 
 function mockClient(overrides: Record<string, unknown> = {}) {
+  let commandHandler: ((invocation: { command: string }) => unknown) | null = null
   const client = {
     initialization: {
       permissions: ['workspace:read', 'workspace:write', 'workspace:list'],
-      shell: { version: '0.7.0' },
+      shell: { version: '0.8.0' },
     },
     capabilities: {
       write: true,
@@ -26,10 +27,14 @@ function mockClient(overrides: Record<string, unknown> = {}) {
     requestNewFile: vi.fn(async () => ({ path: '/schemas/new.schema.json', version: 'v1' })),
     openFile: vi.fn(async () => ({ ok: true })),
     requestFiles: vi.fn(async () => []),
+    onCommand: (handler: (invocation: { command: string }) => unknown) => {
+      commandHandler = handler
+      return () => undefined
+    },
     onDispose: () => () => undefined,
     ...overrides,
   } as unknown as ViewClient
-  return { client }
+  return { client, getCommandHandler: () => commandHandler }
 }
 
 afterEach(() => {
@@ -59,6 +64,16 @@ describe('ProjectHub', () => {
     await waitFor(() => expect(client.openFile).toHaveBeenCalledWith('/schemas/new.schema.json'))
   })
 
+  it('handles the New Schema command without focus', async () => {
+    const { client, getCommandHandler } = mockClient()
+    render(<ProjectHub client={client} />)
+    await waitFor(() => expect(getCommandHandler()).toBeTruthy())
+    const result = await getCommandHandler()!({ command: 'tenon.new-schema' })
+    expect(result).toEqual({ ok: true })
+    expect(client.requestNewFile).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(client.openFile).toHaveBeenCalledWith('/schemas/new.schema.json'))
+  })
+
   it('shows an empty state when there are no schemas', async () => {
     const { client } = mockClient({
       listDirectory: vi.fn(async () => ({ entries: [] })),
@@ -69,7 +84,7 @@ describe('ProjectHub', () => {
 
   it('disables New Schema in a read-only workspace', async () => {
     const { client } = mockClient({
-      initialization: { permissions: ['workspace:read'], shell: { version: '0.7.0' } },
+      initialization: { permissions: ['workspace:read'], shell: { version: '0.8.0' } },
       capabilities: { write: false, createFile: true, directoryListing: true, filePicker: true },
     })
     render(<ProjectHub client={client} />)

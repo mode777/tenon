@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "id": "com.tenon.editor",
   "name": "Tenon",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Schema-first entity and scene authoring for Tenon projects.",
   "publisher": {
     "name": "Tenon"
   },
   "engines": {
-    "exo": ">=0.7.0"
+    "exo": ">=0.8.0"
   },
   "runtime": {
     "entry": "plugin.html"
@@ -38,12 +38,18 @@
         "entry": "views/project.html"
       }
     ],
-    "newFiles": [
+    "commands": [
       {
-        "id": "tenon.schema",
-        "label": "Schema",
-        "fileName": "new.schema.json",
-        "content": "{\n  \"id\": \"com.example.game\",\n  \"version\": \"1.0.0\",\n  \"namespace\": \"game\",\n  \"enums\": {},\n  \"definitions\": {}\n}\n"
+        "id": "tenon.new-schema",
+        "title": "New Schema",
+        "category": "Tenon",
+        "target": {
+          "kind": "panel",
+          "id": "tenon.project"
+        },
+        "menus": [
+          "commandPalette"
+        ]
       }
     ]
   }

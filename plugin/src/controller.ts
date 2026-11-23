@@ -19,7 +19,7 @@ async function main(): Promise<void> {
     label: 'Tenon Schema',
   })
   connection.registration.registerPanel('tenon.project')
-  connection.registration.registerNewFile('tenon.schema')
+  connection.registration.registerCommand('tenon.new-schema')
 
   const ack = await connection.registration.complete()
   show(`Tenon registered: ${ack.accepted.join(', ') || 'no editors'}`)

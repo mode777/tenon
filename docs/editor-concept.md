@@ -224,12 +224,11 @@ editor with level-only controls. There is no separate level format and no level
 field in the document; the `levels/` path selects level mode.
 
 One project-level Tenon panel is the creation hub. It lists schema bundles (and
-later scenes, levels, generators, and assets) and hosts **New Schema**. The plugin
-also contributes a New Schema file template, so the shell exposes the same action
-in the command palette and New File menu. The hub action creates the file and
-opens it; the shell template creates the file for the author to open. Both write
-through shell-owned dialogs. The hub is not a document editor and has no dirty
-state.
+later scenes, levels, generators, and assets) and hosts **New Schema**. The panel
+is also the target of the `tenon.new-schema` command, so the same action is
+available from the Exo command palette. A live command invocation lets the panel
+create the file through the shell-owned dialog and open it in the schema editor.
+The hub is not a document editor and has no dirty state.
 
 The editors are per format, not per definition. Adding a concrete definition is
 a schema edit; it does not add a page, a glob, or editor code. The schema editor
