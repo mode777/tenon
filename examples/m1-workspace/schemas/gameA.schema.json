@@ -1,0 +1,49 @@
+{
+  "id": "com.example.gameA",
+  "version": "1.0.0",
+  "namespace": "gameA",
+  "enums": {
+    "ButtonStyle": {
+      "values": ["primary", "secondary"]
+    }
+  },
+  "definitions": {
+    "gameA:renderable": {
+      "abstract": true,
+      "fields": {
+        "visible": { "type": "bool", "default": true },
+        "castShadows": { "type": "bool", "default": true }
+      }
+    },
+    "gameA:damageable": {
+      "abstract": true,
+      "fields": {
+        "health": { "type": "float", "default": 100 }
+      },
+      "events": {
+        "damaged": {
+          "payload": {
+            "amount": { "type": "float" }
+          }
+        }
+      }
+    },
+    "gameA:button": {
+      "compose": ["gameA:renderable", "gameA:damageable"],
+      "fields": {
+        "label": { "type": "string", "default": "Press" },
+        "enabled": { "type": "bool", "default": true },
+        "style": { "type": "enum", "enum": "ButtonStyle", "default": "primary" }
+      },
+      "events": {
+        "pressed": {}
+      }
+    },
+    "gameA:elevatorButton": {
+      "compose": ["gameA:button"],
+      "fields": {
+        "label": { "type": "string", "default": "Call Elevator" }
+      }
+    }
+  }
+}

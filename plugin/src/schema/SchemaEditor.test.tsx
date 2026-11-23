@@ -1,0 +1,147 @@
+// @vitest-environment jsdom
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { EditorClient } from '@exo/plugin-sdk'
+import { SchemaEditor } from './SchemaEditor'
+import type { SchemaBundle } from '../core/schema'
+
+function sample(): SchemaBundle {
+  return {
+    id: 'com.example.gameA',
+    version: '1.0.0',
+    namespace: 'gameA',
+    enums: {
+      ButtonStyle: { values: ['primary', 'secondary'] },
+    },
+    definitions: {
+      'gameA:renderable': {
+        abstract: true,
+        fields: {
+          visible: { type: 'bool', default: true },
+          castShadows: { type: 'bool', default: true },
+        },
+      },
+      'gameA:button': {
+        compose: ['gameA:renderable'],
+        fields: {
+          label: { type: 'string', default: 'Press' },
+          style: { type: 'enum', enum: 'ButtonStyle', default: 'primary' },
+        },
+        events: {
+          pressed: {},
+        },
+      },
+      'gameA:elevatorButton': {
+        compose: ['gameA:button'],
+        fields: {
+          label: { type: 'string', default: 'Call Elevator' },
+        },
+      },
+    },
+  }
+}
+
+function mockClient() {
+  const saveHandlers: Array<() => { text: string }> = []
+  const dirty: boolean[] = []
+  let commandHandler: ((invocation: { command: string }) => unknown) | null = null
+  const requestNewFile = vi.fn(async () => ({ path: '/schemas/new.schema.json', version: 'v1' }))
+  const openFile = vi.fn(async () => ({ ok: true }))
+  const client = {
+    file: { path: '/schemas/gameA.schema.json' },
+    capabilities: { write: true, createFile: true },
+    initialization: { permissions: ['workspace:write'] },
+    setDirty: (value: boolean) => dirty.push(value),
+    onSaveRequest: (handler: () => { text: string }) => {
+      saveHandlers.push(handler)
+      return () => undefined
+    },
+    onSaveResult: () => () => undefined,
+    onFileChanged: () => () => undefined,
+    onDispose: () => () => undefined,
+    onError: () => () => undefined,
+    onCommand: (handler: (invocation: { command: string }) => unknown) => {
+      commandHandler = handler
+      return () => undefined
+    },
+    requestNewFile,
+    openFile,
+    requestSave: () => undefined,
+    readFile: async () => ({ path: '/schemas/gameA.schema.json', version: 'v1', text: '' }),
+  } as unknown as EditorClient
+  return { client, saveHandlers, dirty, requestNewFile, openFile, getCommandHandler: () => commandHandler }
+}
+
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
+
+describe('SchemaEditor', () => {
+  it('renders definitions, effective fields, and validation', () => {
+    const { client } = mockClient()
+    render(<SchemaEditor client={client} initialDoc={sample()} canWrite />)
+    expect(screen.getAllByText('gameA:button').length).toBeGreaterThan(0)
+    expect(screen.getByText('Fields')).toBeTruthy()
+    expect(screen.getByText('Effective')).toBeTruthy()
+    expect(screen.getAllByText(/errors/).length).toBeGreaterThan(0)
+  })
+
+  it('adds a field through the inline form', async () => {
+    const user = userEvent.setup()
+    const { client } = mockClient()
+    render(<SchemaEditor client={client} initialDoc={sample()} canWrite />)
+    await user.click(screen.getByRole('button', { name: /Field/ }))
+    const input = screen.getByPlaceholderText('field name')
+    await user.type(input, 'count')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect((await screen.findAllByText('count')).length).toBeGreaterThan(0)
+  })
+
+  it('creates a new definition from the sidebar', async () => {
+    const user = userEvent.setup()
+    const { client } = mockClient()
+    render(<SchemaEditor client={client} initialDoc={sample()} canWrite />)
+    await user.click(screen.getByRole('button', { name: /New definition/ }))
+    const input = screen.getByPlaceholderText('local name')
+    await user.type(input, 'trigger')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect((await screen.findAllByText('trigger')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('gameA:trigger').length).toBeGreaterThan(0)
+  })
+
+  it('reports dirty and returns serialized text on save', async () => {
+    const user = userEvent.setup()
+    const { client, saveHandlers, dirty } = mockClient()
+    render(<SchemaEditor client={client} initialDoc={sample()} canWrite />)
+    await user.click(screen.getByRole('button', { name: /New definition/ }))
+    const input = screen.getByPlaceholderText('local name')
+    await user.type(input, 'trigger')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await waitFor(() => expect(dirty.at(-1)).toBe(true))
+    expect(saveHandlers.length).toBeGreaterThan(0)
+    const saved = saveHandlers[0]()
+    expect(JSON.parse(saved.text).definitions['gameA:trigger']).toBeTruthy()
+  })
+
+  it('switches to the effective view and shows origin badges', async () => {
+    const user = userEvent.setup()
+    const { client } = mockClient()
+    render(<SchemaEditor client={client} initialDoc={sample()} canWrite />)
+    await user.click(screen.getByRole('tab', { name: /Effective/ }))
+    expect(screen.getByText('This is the flat definition the runtime and inspector will see.')).toBeTruthy()
+    expect(screen.getAllByText('gameA:renderable').length).toBeGreaterThan(0)
+  })
+
+  it('renders the validation drawer and jumps to an issue', async () => {
+    const user = userEvent.setup()
+    const bundle = sample()
+    bundle.definitions['gameA:button'].compose = ['gameA:missing']
+    const { client } = mockClient()
+    render(<SchemaEditor client={client} initialDoc={bundle} canWrite />)
+    await user.click(screen.getAllByRole('button', { name: /errors/ })[0])
+    expect(screen.getByRole('region', { name: 'Validation' })).toBeTruthy()
+    expect(screen.getByText(/does not exist/)).toBeTruthy()
+  })
+})

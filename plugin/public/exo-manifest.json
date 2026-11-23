@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "com.tenon.editor",
+  "name": "Tenon",
+  "version": "0.1.0",
+  "description": "Schema-first entity and scene authoring for Tenon projects.",
+  "publisher": {
+    "name": "Tenon"
+  },
+  "engines": {
+    "exo": ">=0.7.0"
+  },
+  "runtime": {
+    "entry": "plugin.html"
+  },
+  "permissions": [
+    "workspace:read",
+    "workspace:write",
+    "workspace:list",
+    "events:subscribe"
+  ],
+  "contributes": {
+    "fileEditors": [
+      {
+        "glob": "schemas/*.schema.json",
+        "entry": "editor.html",
+        "label": "Tenon Schema",
+        "priority": 30,
+        "rendering": "frame"
+      }
+    ],
+    "panels": [
+      {
+        "id": "tenon.project",
+        "title": "Tenon",
+        "icon": "symbol-structure",
+        "location": "primary",
+        "entry": "views/project.html"
+      }
+    ],
+    "newFiles": [
+      {
+        "id": "tenon.schema",
+        "label": "Schema",
+        "fileName": "new.schema.json",
+        "content": "{\n  \"id\": \"com.example.game\",\n  \"version\": \"1.0.0\",\n  \"namespace\": \"game\",\n  \"enums\": {},\n  \"definitions\": {}\n}\n"
+      }
+    ]
+  }
+}

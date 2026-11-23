@@ -1,0 +1,12 @@
+{
+  "name": "tenon",
+  "private": true,
+  "type": "module",
+  "workspaces": ["sdk", "plugin"],
+  "scripts": {
+    "dev": "npm run dev --workspace plugin",
+    "build": "npm run build --workspace plugin",
+    "typecheck": "npm run typecheck --workspace plugin",
+    "test": "npm run test --workspace plugin"
+  }
+}

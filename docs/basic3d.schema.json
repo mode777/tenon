@@ -1,0 +1,57 @@
+{
+  "id": "com.tenon.basic3d",
+  "version": "1.0.0",
+  "namespace": "basic3d",
+  "enums": {},
+  "definitions": {
+    "basic3d:renderable": {
+      "abstract": true,
+      "fields": {
+        "visible": { "type": "bool", "default": true },
+        "castShadows": { "type": "bool", "default": true }
+      }
+    },
+    "basic3d:light": {
+      "abstract": true,
+      "fields": {
+        "color": { "type": "color", "default": [1, 1, 1] },
+        "intensity": { "type": "float", "default": 1 },
+        "castShadows": { "type": "bool", "default": true }
+      }
+    },
+    "basic3d:node": {
+      "fields": {}
+    },
+    "basic3d:mesh": {
+      "compose": ["basic3d:renderable"],
+      "fields": {
+        "mesh": { "type": "assetRef" }
+      }
+    },
+    "basic3d:camera": {
+      "fields": {
+        "fov": { "type": "float", "default": 60 },
+        "near": { "type": "float", "default": 0.1 },
+        "far": { "type": "float", "default": 1000 },
+        "active": { "type": "bool", "default": false }
+      }
+    },
+    "basic3d:directionalLight": {
+      "compose": ["basic3d:light"]
+    },
+    "basic3d:pointLight": {
+      "compose": ["basic3d:light"],
+      "fields": {
+        "range": { "type": "float", "default": 10 }
+      }
+    },
+    "basic3d:spotLight": {
+      "compose": ["basic3d:light"],
+      "fields": {
+        "range": { "type": "float", "default": 10 },
+        "innerAngle": { "type": "float", "default": 30 },
+        "outerAngle": { "type": "float", "default": 45 }
+      }
+    }
+  }
+}

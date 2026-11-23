@@ -1,0 +1,117 @@
+/*
+ * Optional semantic tokens for Exo plugin pages.
+ *
+ * Import before your component styles, then set data-theme on the document
+ * element from shell/init.theme (the @exo/plugin-sdk/theme helper does this).
+ * The dark palette is the root default; the media query only applies before the
+ * handshake sets an explicit theme. See docs/contracts/plugin-styling.md.
+ */
+
+:root {
+  color-scheme: dark;
+
+  --exo-bg: #1f1f1f;
+  --exo-fg: #cccccc;
+  --exo-muted-fg: #9d9d9d;
+  --exo-border: #3c3c3c;
+  --exo-surface: #181818;
+  --exo-surface-hover: #2a2d2e;
+  --exo-accent: #0078d4;
+  --exo-accent-fg: #ffffff;
+  --exo-accent-hover: #026ec1;
+  --exo-focus: #3794ff;
+  --exo-link: #4daafc;
+  --exo-selection-bg: #264f78;
+  --exo-selection-fg: #ffffff;
+  --exo-input-bg: #1f1f1f;
+  --exo-input-fg: #cccccc;
+  --exo-input-border: #6b6b6b;
+  --exo-danger: #f85149;
+  --exo-warning: #cca700;
+  --exo-success: #81b88b;
+
+  --exo-font-ui:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Ubuntu, Cantarell, 'Helvetica Neue',
+    Arial, sans-serif;
+  --exo-font-mono: 'SF Mono', Monaco, Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --exo-font-size: 13px;
+  --exo-radius: 4px;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --exo-bg: #ffffff;
+  --exo-fg: #3b3b3b;
+  --exo-muted-fg: #616161;
+  --exo-border: #d4d4d4;
+  --exo-surface: #f8f8f8;
+  --exo-surface-hover: #e8e8e8;
+  --exo-accent: #005fb8;
+  --exo-accent-fg: #ffffff;
+  --exo-accent-hover: #0258a8;
+  --exo-focus: #005fb8;
+  --exo-link: #005fb8;
+  --exo-selection-bg: #add6ff;
+  --exo-selection-fg: #1f1f1f;
+  --exo-input-bg: #ffffff;
+  --exo-input-fg: #3b3b3b;
+  --exo-input-border: #767676;
+  --exo-danger: #c62828;
+  --exo-warning: #8a6700;
+  --exo-success: #2f7d32;
+}
+
+:root[data-theme='high-contrast'] {
+  color-scheme: dark;
+
+  --exo-bg: #000000;
+  --exo-fg: #ffffff;
+  --exo-muted-fg: #c8c8c8;
+  --exo-border: #6fc3df;
+  --exo-surface: #000000;
+  --exo-surface-hover: #1a1a1a;
+  --exo-accent: #0078d4;
+  --exo-accent-fg: #ffffff;
+  --exo-accent-hover: #026ec1;
+  --exo-focus: #f38518;
+  --exo-link: #3794ff;
+  --exo-selection-bg: #264f78;
+  --exo-selection-fg: #ffffff;
+  --exo-input-bg: #000000;
+  --exo-input-fg: #ffffff;
+  --exo-input-border: #6fc3df;
+  --exo-danger: #ff6b6b;
+  --exo-warning: #ffcc00;
+  --exo-success: #89d185;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+
+    --exo-bg: #ffffff;
+    --exo-fg: #3b3b3b;
+    --exo-muted-fg: #616161;
+    --exo-border: #d4d4d4;
+    --exo-surface: #f8f8f8;
+    --exo-surface-hover: #e8e8e8;
+    --exo-accent: #005fb8;
+    --exo-accent-fg: #ffffff;
+    --exo-accent-hover: #0258a8;
+    --exo-focus: #005fb8;
+    --exo-link: #005fb8;
+    --exo-selection-bg: #add6ff;
+    --exo-selection-fg: #1f1f1f;
+    --exo-input-bg: #ffffff;
+    --exo-input-fg: #3b3b3b;
+    --exo-input-border: #767676;
+    --exo-danger: #c62828;
+    --exo-warning: #8a6700;
+    --exo-success: #2f7d32;
+  }
+}

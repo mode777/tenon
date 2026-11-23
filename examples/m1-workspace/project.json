@@ -1,0 +1,5 @@
+{
+  "imports": {
+    "gameA": "schemas/gameA.schema.json"
+  }
+}

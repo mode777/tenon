@@ -1,6 +1,8 @@
 # Tenon Editor Concept
 
-Tenon is a browser-based 3D editor for building entity-based scenes. It is schema-driven and data-only: the editor defines and places entities, scenes compose them, and the engine interprets entity types at runtime.
+Tenon is a browser-based 3D editor for building entity-based scenes. It is schema-driven and data-only: the editor defines and places entities, scenes compose them, and the engine interprets concrete definitions at runtime.
+
+The editor is designed as one Exo editor plugin. The Exo shell owns the workspace, tabs, dirty state, saves, consent, and theme; Tenon contributes one visual editor per authoring format. The engine and build runner stay outside the editor frame.
 
 A **level** is simply a scene document used as the top-level world.
 
@@ -8,61 +10,84 @@ A **level** is simply a scene document used as the top-level world.
 
 | Concept | Definition |
 |---|---|
-| **Schema bundle** | A versioned, namespaced JSON file containing enums, property groups, and entity types. Checked into the project. |
-| **Property group** | A reusable, data-only set of fields with defaults. No behavior. |
-| **Entity type** | A fixed archetype: its own fields plus included property groups, plus optional event declarations. Maps to one engine class. |
-| **Entity instance** | A placed entity with a stable local ID, display name, type, property values, and optional parent/slot. |
+| **Schema bundle** | A versioned, namespaced JSON file containing enums and entity definitions. Builtin, project-local, or remote. |
+| **Entity definition** | A named schema entry with fields, defaults, optional events, and optional composition. Concrete definitions are instantiable; abstract definitions are not. |
+| **Abstract definition** | A non-instantiable definition used as a base or mixin. Hidden from the entity palette and has no engine class. |
+| **Definition composition** | A schema/build-time `compose` list that includes fields, defaults, and events from abstract or concrete definitions. Flattened before runtime; never runtime inheritance. |
+| **Entity instance** | A placed entity with a stable local ID, display name, concrete definition ID, transform, property values, and optional parent/slot. |
 | **Scene** | A saved entity tree with one root entity. Reusable and instanced. |
-| **Scene instance** | A node that references a scene document and supplies overrides for its promoted properties. Atomic from the outside. |
+| **Scene instance** | A node that references a scene document, carries its own transform, and supplies overrides for its promoted properties. Atomic from the outside. |
 | **Promotion** | An alias from a direct child field or event to the scene root. Defines public API. |
 | **Slot** | A named transform exposed by a scene where a host may attach an entity. |
-| **Event** | A named output with an optional typed payload. Declared by an entity type, emitted by the engine class. |
+| **Event** | A named output with an optional typed payload. Declared by a definition, emitted by the engine class. |
 | **Generator** | A parameterized asset source. Runs in the editor/build; bakes to a static mesh. |
 
-Entity types are flat. Property groups are the only mechanism for composing fields. An entity type has a fixed set of groups; instances cannot add or remove groups.
+Definitions are flat after composition. Composition is schema/build-time and data-only:
+it includes fields, defaults, and events, never engine classes or behavior. Abstract
+definitions are hidden and non-instantiable; concrete definitions are instantiable and
+map to one engine class. Transforms are built-in placement data, not fields.
 
 ## Schema
 
-- Schema bundles are checked into the project and referenced by relative path.
+- Project schema bundles are checked in; remote bundles resolve through imports. Builtin bundles ship with the Tenon plugin and engine (TD-25).
 - Each bundle declares a namespace and a version.
-- The project manifest maps namespaces to schema files.
-- The schema editor is a first-class part of Tenon. Types, fields, enums, defaults, and events are authored there.
+- The project manifest maps namespaces to locations; scenes require `namespace@version`.
+- `basic3d` is the builtin default. Its reference schema is [basic3d.schema.json](basic3d.schema.json). It is read-only and extended by composition, not edited.
+- The schema editor is a first-class part of Tenon. Definitions, abstract flags, composition, fields, enums, defaults, and events are authored there.
 - The engine aligns to the schema. The schema is the shared data contract for editor UI, validation, and engine registration.
-- Property groups are data-only. Behavior is implemented by the engine class.
-- Field defaults resolve as: **group default → entity type override → instance value**.
-- Field names are unique across an entity type's composed groups. A collision is a schema error.
-- At runtime, all groups are flattened into one flat property list. The engine never sees groups.
+- Definitions are data-only. Behavior is implemented by the engine class.
+- Field defaults resolve as: **composed definition default → composing definition override → instance value**. A field without a default is required.
+- Each inherited field has one origin definition. Two different origins with the same field name are a schema error; a definition may override an inherited default only with the same field type.
+- Abstract definitions are hidden from the palette, cannot be scene roots, and have no engine class.
+- A concrete definition may be composed into another definition. Only its fields, defaults, and events contribute; it remains instantiable, and its engine class is not inherited.
+- Transforms are not part of the schema. Every entity instance has one (see [Transforms](#transforms)).
+- At runtime, composition is flattened into one flat property list. The engine never sees definitions or composition.
+
+## Default scene
+
+A new empty scene pins the current builtin schema and starts with one `basic3d:node` root:
+
+```json
+{
+  "id": "scene_empty",
+  "requires": ["basic3d@1.0.0"],
+  "root": "root",
+  "entities": [{ "id": "root", "type": "basic3d:node" }],
+  "promotes": {},
+  "slots": {}
+}
+```
 
 ## How an entity is created
 
-1. Define or select an entity type in the schema editor.
-2. Add fields directly to the type or include property groups. Set defaults, enums, documentation, and editor hints.
-3. Declare any events the type can emit.
-4. Open a scene or level and choose the type from the entity palette.
-5. Place the entity in the viewport. Tenon creates an entity instance with a stable local ID and a default display name.
-6. The inspector shows the type's effective fields. Values start from defaults; the instance stores only overrides.
+1. Define or select a concrete definition in the schema editor.
+2. Add fields directly or compose abstract and concrete definitions. Set defaults, enums, documentation, and editor hints.
+3. Declare any events the definition can emit, or inherit them through composition.
+4. Open a scene or level and choose a concrete definition from the entity palette.
+5. Place the entity in the viewport. Tenon creates an entity instance with a stable local ID, a default display name, and an identity transform.
+6. The inspector shows the definition's effective fields. Values start from defaults; the instance stores only property overrides.
 7. Optionally parent the entity to another entity, or attach it to a scene instance's slot.
-8. Save the scene document. No editor plugin or per-type editor code is required.
-9. At build/runtime, the type ID maps to an engine class. The engine receives the flattened property list and applies it.
+8. Save the scene document. No per-definition editor code is required; the format editors are generic.
+9. At build/runtime, the `type` ID (the `classname` equivalent) selects an engine class. It is identity, not a property, and is never part of the flattened property list. The runtime keeps the entity hierarchy, composes transforms through it, and gives the engine the composed transform and flat property list.
 
 ## How a scene is created
 
-1. Create a new scene document and choose the root entity's type. The root is an entity, not a scene instance.
+1. Create a new scene document and choose the root entity's concrete definition. The root is an entity, not a scene instance, and cannot be abstract.
 2. Add child entities and parent them into a hierarchy.
 3. Promote direct child fields and events to the scene root. Promotions define the scene's public surface.
 4. Declare slots: named child transforms where hosts may attach entities.
 5. Save the scene. It can now be instanced in another scene or level.
-6. To use it, add a scene instance node, point it at the scene document, and override root fields or promoted properties.
+6. To use it, add a scene instance node, point it at the scene document, place it with a transform, and override root fields or promoted properties.
 7. Attach host-owned entities to slots when the scene needs external content.
 8. A scene instance is atomic from the outside: its internal entities are read-only from the host scene. Host-owned content attaches only through declared slots.
 9. Validation checks scene requirements, promotions, slots, references, and hierarchy.
 
-## Public surface and composition
+## Public surface and scene composition
 
 A scene's public surface is:
 
-- the root entity's own fields;
-- the root entity's own events;
+- the root entity's effective fields, including composed fields;
+- the root entity's effective events, including composed events;
 - fields promoted from direct children;
 - events promoted from direct children;
 - declared slots.
@@ -90,6 +115,7 @@ Promoted names are public API. A scene should treat renaming or removing a promo
 - A scene instance is one node in the host tree. Its internal tree is private.
 - The only way to attach content across a scene boundary is a declared slot.
 - Attachments are owned by the host scene, even though they are spatially parented to a slot inside the instance.
+- At build time, a slot attachment becomes a concrete parent link in the resolved hierarchy; the slot name itself is authoring metadata.
 - Scene instances may contain other scene instances; their boundaries remain atomic.
 
 ```text
@@ -101,11 +127,29 @@ Level
       └─ button_1             host-owned entity attached to the slot
 ```
 
+## Transforms
+
+Every entity instance has a transform: position, rotation, and scale. It is built-in
+placement data, not a schema field or definition, and it is stored outside `props`.
+
+- An omitted transform or omitted component defaults to identity.
+- The viewport edits transforms directly; the schema editor and schema-generated
+  inspector do not.
+- Hierarchy composes transforms from parent to child. A scene instance's transform
+  places the referenced scene; the scene root stays relative to the instance.
+- Building does not flatten the transform hierarchy. Scene boundaries and slot names
+  resolve into concrete parent links, so moving an elevator still moves an attached
+  button at runtime (TD-23).
+- Transforms are never promoted. A host positions a scene instance, not its internal
+  entities. Slots expose a named child transform for attachment, and an attached
+  entity's transform is relative to the slot.
+- Every entity has a transform, including non-visual and data-only entities.
+
 ## Events
 
 Events are named outputs. They are conceptually clear and keep internals private.
 
-- An entity type declares the events it can emit.
+- A definition declares the events it can emit. Composed definitions contribute their event declarations.
 - A payload is optional and typed using the same field types as properties.
 - The engine class implements what the event means, when it fires, and how the payload is produced.
 - A scene promotes direct child events to its root.
@@ -127,29 +171,125 @@ Generators are parameterized asset sources.
 - Interactive parts are separate entities. A house generator can produce the shell and door opening; the door is a separate runtime entity with its own behavior.
 - Generator parameters use the same field types and defaults as schema fields.
 
+## Imported meshes
+
+An imported mesh file such as `.glb` is an **asset**, not an entity. The file lives
+under `assets/` and is available to `assetRef` fields; it does not create scene
+nodes.
+
+The Exo shell owns the workspace. The user adds the file to `assets/` in the
+workspace folder; the editor browses and selects it. The Tenon plugin never copies
+an external file and never receives a file handle.
+
+To place one:
+
+1. Use a mesh definition (for example `basic3d:mesh`) that exposes an `assetRef` field.
+2. Place an instance and pick the asset through the shell picker or asset browser.
+3. Position it with the entity transform.
+
+Multiple entities may reference one asset. A glb's internal nodes and transforms are
+asset data, not entities; split out parts that need their own behavior into separate
+assets and entities. Tenon does not author the mesh, UVs, or materials.
+
 ## Authoring and runtime
 
 Tenon has two distinct outputs:
 
 - **Authoring documents** — editable JSON. Source of truth. Entities, scenes, schema references, generator parameters, promotions, and bake settings.
-- **Runtime bake** — generated build output. Baked meshes, lightmaps, resolved entity instances, flat properties, and event bindings as needed. No generators, editor metadata, or authoring data.
+- **Runtime bake** — generated build output. Baked meshes, lightmaps, resolved entity instances, local transforms and parent links, flat properties, and event bindings as needed. No generators, editor metadata, or authoring data.
 
-The editor edits authoring documents. Playtest loads the bake. The runtime never runs generators or bakes lightmaps.
+The editor edits authoring documents and saves them through the Exo shell. Build and playtest run outside the editor frame: the Tenon CLI/CI writes the bake, and the playtest runner loads it. The plugin never writes build output. The runtime never runs generators or bakes lightmaps. The build resolves scene composition boundaries, not the entity transform hierarchy; the runtime keeps the resolved parent links so dynamic parent movement propagates to children.
 
 Lightmaps, navmeshes, collision meshes, LODs, and occlusion data are bake artifacts. Their settings live in authoring; their results live in the runtime build.
 
-## Editor UI
+## Editor host and format editors
+
+Tenon runs as one Exo editor plugin. The Exo shell owns the workspace, file tree,
+tabs, breadcrumbs, Save/Save All, dirty indicators, external-change notices,
+consent, and theme. Tenon owns the document area inside each editor frame. It
+never reads, writes, or lists `exo.json` or `/.exo/**`, and it never receives a
+filesystem handle.
+
+The plugin contributes one visible frame editor per authoring format:
+
+| Editor | Opens | Main surface |
+|---|---|---|
+| **Project** | `project.json` | Import map, resolved schema versions, project-wide validation, build readiness |
+| **Schema** | `schemas/*.schema.json` | Definition tree, composition, fields, enums, defaults, events, read-only builtins |
+| **Scene** | `scenes/*.scene.json`, `levels/*.scene.json` | Hierarchy, 3D viewport, inspector, palette, promotions, slots, validation |
+| **Generator** | `generators/*/generator.json` | Parameter form, seed, preview, bake settings |
+
+A level is a scene document used as the top-level world, so it opens in the scene
+editor with level-only controls. There is no separate level format and no level
+field in the document; the `levels/` path selects level mode.
+
+One project-level Tenon panel is the creation hub. It lists schema bundles (and
+later scenes, levels, generators, and assets) and hosts **New Schema**. The plugin
+also contributes a New Schema file template, so the shell exposes the same action
+in the command palette and New File menu. The hub action creates the file and
+opens it; the shell template creates the file for the author to open. Both write
+through shell-owned dialogs. The hub is not a document editor and has no dirty
+state.
+
+The editors are per format, not per definition. Adding a concrete definition is
+a schema edit; it does not add a page, a glob, or editor code. The schema editor
+is the first editor milestone; the scene editor follows.
+
+### Scene and level editor
 
 - 3D viewport with selection, transform gizmos, grid, and snapping.
 - Scene hierarchy panel.
-- Schema editor for types, property groups, fields, enums, defaults, and events.
 - Schema-generated property inspector.
-- Entity palette.
-- Scene and asset browsers.
-- Generator browser with parameter editing and preview.
-- Validation panel.
-- Build and playtest controls.
+- Entity palette showing concrete definitions only.
+- Asset browser for meshes in `assets/`.
+- Scene instance inspector for root and promoted overrides.
+- Promotion and slot editors for the open scene.
+- Validation drawer for the open document.
 - 2D orthographic views are a later addition.
+
+A scene instance is atomic in the editor: its internals are read-only from the
+host scene, and host content attaches only through declared slots.
+
+### Schema editor
+
+- Definition tree grouped by namespace, with abstract and concrete definitions.
+- Forms for composition, fields, enums, defaults, events, and documentation;
+  editor hints are a later schema feature.
+- Composition picker that prevents cycles and shows effective fields and events.
+- Read-only view of the builtin `basic3d` bundle shipped with the plugin.
+- Schema validation with actionable errors.
+- No behavior, engine class, or script authoring.
+
+The schema editor UI and its M1 scope are specified in [Schema editor UI](schema-editor-ui.md).
+
+### Project editor
+
+- Import map from namespaces to builtin, project-relative, or HTTPS locations.
+- Resolved schema versions and content hashes.
+- Project-wide validation across schemas, scenes, generators, and assets.
+- Build readiness and the exact build command. Builds and playtests run outside
+  the editor frame.
+
+### Generator editor
+
+- Parameter form generated from the generator parameter schema.
+- Seed, preview, and bake settings.
+- Generator script entry opens in a code editor; Tenon references it but does not
+  author generator code.
+
+### Frame rules
+
+- Each open document gets its own frame, buffer, selection, and undo history.
+- The shell owns Save, Save All, dirty state, and conflict notices. A Tenon frame
+  reports dirty honestly and returns content only through its save handler.
+- External changes never silently replace a dirty buffer.
+- A read-only workspace opens the editor read-only; Save and dirty state are
+  unavailable.
+- References open through the shell's open-file action; a frame does not reach
+  into another frame.
+- Frames use the Exo theme tokens and support dark, light, and high contrast.
+- Frames do not recreate shell chrome, and every page stays inside the plugin
+  root.
 
 The editor is not a modeling tool. Geometry comes from imported meshes and parametric generators. UV, material, and behavior authoring live outside Tenon.
 
@@ -158,19 +298,20 @@ The editor is not a modeling tool. Geometry comes from imported meshes and param
 ```json
 {
   "id": "scene_door",
-  "requires": ["basic3d@1.0.0"],
+  "requires": ["basic3d@1.0.0", "gameA@1.0.0"],
   "root": "root",
   "entities": [
-    { "id": "root", "type": "basic3d:group" },
+    { "id": "root", "type": "basic3d:node" },
     {
       "id": "hinge",
-      "type": "basic3d:hinge",
+      "type": "gameA:hinge",
       "parent": "root",
+      "transform": { "position": [0, 0.5, 0] },
       "props": { "open": 0 }
     },
     {
       "id": "handle_anchor",
-      "type": "basic3d:group",
+      "type": "basic3d:node",
       "parent": "root"
     }
   ],
@@ -190,14 +331,20 @@ A scene instance uses `scene` instead of `type`:
 {
   "id": "door_1",
   "scene": "scenes/door.scene.json",
+  "transform": { "position": [3, 0, 0] },
   "props": { "openAmount": 0.5 }
 }
 ```
 
+The root and `handle_anchor` omit transforms, so they use identity transforms. The scene
+instance transform places the whole door scene.
+
 ## Workflow summary
 
 ```text
-define schema → create scene/entities → compose scenes → validate → bake → playtest
+open project in Exo → define schema → create scene/entities → compose scenes → validate → build (CLI/CI) → playtest
 ```
 
-The editor stays generic. The schema defines the vocabulary. The engine implements the vocabulary. The data composes it.
+Authoring happens in the Tenon format editors inside Exo. The build and playtest
+runner stay outside the plugin. The editor stays generic; the schema defines the
+vocabulary, the engine implements it, and the data composes it.
