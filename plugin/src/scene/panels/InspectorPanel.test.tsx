@@ -12,6 +12,7 @@ function renderInspector(
   selection: string | null,
   canWrite = true,
   doc = levelScene(),
+  onRefresh = vi.fn(),
 ) {
   const loaded = workspace()
   const onSelect = vi.fn()
@@ -24,11 +25,12 @@ function renderInspector(
       context={contextFor(doc, loaded)}
       workspace={loaded}
       canWrite={canWrite}
+      onRefresh={onRefresh}
       onSelect={onSelect}
       onCommand={onCommand}
     />,
   )
-  return { onSelect, onCommand }
+  return { onSelect, onCommand, onRefresh }
 }
 
 describe('InspectorPanel', () => {
@@ -98,6 +100,23 @@ describe('InspectorPanel', () => {
 
     await user.click(screen.getAllByRole('button', { name: 'Remove' })[0])
     expect(onCommand).toHaveBeenLastCalledWith({ type: 'remove-requirement', index: 0 })
+  })
+
+  it('resolves a scene-relative asset reference and refreshes assets', async () => {
+    const user = userEvent.setup()
+    const doc = levelScene()
+    doc.entities.push({
+      id: 'mesh_1',
+      type: 'basic3d:mesh',
+      parent: 'root',
+      props: { mesh: '../assets/cube.glb' },
+    })
+    const { onRefresh } = renderInspector('mesh_1', true, doc)
+    const asset = screen.getByLabelText('Asset') as HTMLSelectElement
+    expect(asset.value).toBe('/assets/cube.glb')
+    await user.selectOptions(asset, '/assets/cube.glb')
+    await user.click(screen.getByRole('button', { name: 'Refresh assets' }))
+    expect(onRefresh).toHaveBeenCalledTimes(1)
   })
 
   it('disables edits in a read-only workspace', () => {

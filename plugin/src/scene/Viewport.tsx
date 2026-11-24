@@ -10,6 +10,8 @@ import {
   entityIsSceneInstance,
   normalizeScenePath,
   normalizeTransform,
+  resolveScenePath,
+  sceneWorkspacePath,
   type EntityTransform,
   type SceneDocument,
   type SceneEntity,
@@ -52,13 +54,19 @@ function transformProps(transform?: EntityTransform) {
   }
 }
 
-function assetPathFor(entity: SceneEntity, context: SceneValidationContext): string | null {
+function assetPathFor(
+  entity: SceneEntity,
+  document: SceneDocument,
+  context: SceneValidationContext,
+): string | null {
   if (!entity.type) return null
   const effective = effectiveForType(entity.type, context)
   const field = effective.fields.find((item) => item.field.type === 'assetRef')
   if (!field) return null
   const value = entity.props?.[field.name]
-  return typeof value === 'string' && value.length > 0 ? value : null
+  return typeof value === 'string' && value.length > 0
+    ? resolveScenePath(value, sceneWorkspacePath(document, context))
+    : null
 }
 
 const assetCache = new Map<string, Promise<THREE.Object3D>>()
@@ -199,7 +207,7 @@ function EntityVisual({
 }) {
   if (!entity.type) return null
   const local = entity.type.split(':').at(-1) ?? ''
-  const asset = assetPathFor(entity, context)
+  const asset = assetPathFor(entity, document, context)
   if (asset) {
     return <AssetModel client={client} path={asset} selected={selected} />
   }
@@ -230,7 +238,6 @@ function EntityVisual({
   if (local === 'camera') {
     return <Marker kind="camera" selected={selected} muted={muted} external={false} />
   }
-  void document
   return <Marker kind="node" selected={selected} muted={muted} external={false} />
 }
 
@@ -414,7 +421,9 @@ function SceneInstanceNode({
 }) {
   if (depth > 40) return null
   const selected = !readOnly && selectedId === instance.id
-  const target = instance.scene ? context.scenes[normalizeScenePath(instance.scene)] : undefined
+  const target = instance.scene
+    ? context.scenes[resolveScenePath(instance.scene, sceneWorkspacePath(document, context))]
+    : undefined
   const targetRoot = target ? entityById(target, target.root) : undefined
   const attachments = useMemo<Attachments>(() => {
     const byAnchor = new Map<string, SceneEntity[]>()

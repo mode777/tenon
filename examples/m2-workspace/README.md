@@ -43,3 +43,6 @@ m2-workspace/
 - `levels/level01.scene.json` instances the train, overrides `power`, and attaches
   a `gameA:button` entity through the slot.
 - `assets/cube.glb` is a real glTF binary used by the body and wheel mesh instances.
+- Scene and asset references use workspace-absolute paths (`/scenes/…`, `/assets/…`);
+  scene-relative paths (`../assets/…`) are equally valid and resolved against the
+  containing scene.

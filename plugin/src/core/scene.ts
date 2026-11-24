@@ -136,6 +136,8 @@ export const IDENTITY_POSITION: Vec3 = [0, 0, 0]
 export const IDENTITY_ROTATION: Vec3 = [0, 0, 0]
 export const IDENTITY_SCALE: Vec3 = [1, 1, 1]
 
+const SCHEME_PATTERN = /^[a-z][a-z0-9+.-]*:/i
+
 export function normalizeScenePath(path: string): string {
   const clean = path.trim().replaceAll('\\', '/')
   if (!clean) return ''
@@ -148,6 +150,86 @@ export function displayScenePath(path: string): string {
 
 export function sceneFileName(path: string): string {
   return normalizeScenePath(path).split('/').at(-1) ?? path
+}
+
+function pathSegments(path: string): string[] {
+  return path
+    .replaceAll('\\', '/')
+    .split('/')
+    .filter((segment) => segment.length > 0 && segment !== '.')
+}
+
+/** Directory containing a document path. `/scenes/train.scene.json` → `/scenes`. */
+export function sceneDirectoryPath(scenePath: string | undefined): string {
+  if (!scenePath) return '/'
+  const normalized = normalizeScenePath(scenePath)
+  const index = normalized.lastIndexOf('/')
+  return index <= 0 ? '/' : normalized.slice(0, index)
+}
+
+function resolveSegments(
+  reference: string,
+  fromScenePath: string | undefined,
+): { path: string; escaped: boolean } {
+  const clean = reference.trim().replaceAll('\\', '/')
+  if (!clean) return { path: '', escaped: false }
+  if (SCHEME_PATTERN.test(clean) || clean.startsWith('//')) {
+    return { path: clean, escaped: false }
+  }
+  const segments = clean.startsWith('/')
+    ? []
+    : pathSegments(sceneDirectoryPath(fromScenePath))
+  let escaped = false
+  for (const segment of clean.split('/')) {
+    if (!segment || segment === '.') continue
+    if (segment === '..') {
+      if (segments.length === 0) escaped = true
+      else segments.pop()
+      continue
+    }
+    segments.push(segment)
+  }
+  return { path: `/${segments.join('/')}`, escaped }
+}
+
+/**
+ * Resolve an external reference against the document that contains it. A leading
+ * `/` means workspace-root relative; anything else is relative to the containing
+ * scene's directory. The result is the canonical workspace path used for lookups.
+ */
+export function resolveScenePath(reference: string, fromScenePath?: string): string {
+  return resolveSegments(reference, fromScenePath).path
+}
+
+/** True when a relative reference climbs above the workspace root. */
+export function referenceEscapesWorkspace(
+  reference: string,
+  fromScenePath?: string,
+): boolean {
+  return resolveSegments(reference, fromScenePath).escaped
+}
+
+/**
+ * Canonical path of a scene document in the workspace. Validation and panels pass
+ * documents from `context.scenes`, so the path can be recovered by identity.
+ */
+export function sceneWorkspacePath(
+  scene: SceneDocument,
+  context: SceneValidationContext,
+): string | undefined {
+  for (const [path, candidate] of Object.entries(context.scenes)) {
+    if (candidate === scene) return path
+  }
+  return undefined
+}
+
+/** Resolve an entity's external reference against its containing scene. */
+export function resolveSceneReference(
+  scene: SceneDocument,
+  reference: string,
+  context: SceneValidationContext,
+): string {
+  return resolveScenePath(reference, sceneWorkspacePath(scene, context))
 }
 
 export function parseSceneText(text: string): SceneDocument {
@@ -427,7 +509,7 @@ function entitySurface(
     return { fields: effective.fields, events: effective.events, issues: effective.issues }
   }
   if (entity.scene) {
-    const target = context.scenes[normalizeScenePath(entity.scene)]
+    const target = context.scenes[resolveSceneReference(scene, entity.scene, context)]
     if (!target) {
       return {
         fields: [],
@@ -705,7 +787,8 @@ export function scenePublicValue(
       : field.field.default
   }
   if (target.scene) {
-    const referenced = context.scenes[normalizeScenePath(target.scene)]
+    const referenced =
+      context.scenes[resolveSceneReference(scene, target.scene, context)]
     if (!referenced) return undefined
     return scenePublicValue(referenced, field.targetFieldName ?? name, context, [...stack, scene])
   }
@@ -838,13 +921,26 @@ function validateAsset(
   entity: SceneEntity,
   fieldName: string,
   value: unknown,
+  scenePath: string | undefined,
   context: SceneValidationContext,
   issues: ValidationIssue[],
   seen: Set<string>,
 ): void {
   if (typeof value !== 'string' || value.length === 0 || !context.assets) return
-  const normalized = normalizeScenePath(value)
-  if (!context.assets.some((asset) => normalizeScenePath(asset) === normalized)) {
+  const resolved = resolveScenePath(value, scenePath)
+  if (referenceEscapesWorkspace(value, scenePath)) {
+    addSceneIssue(
+      issues,
+      sceneIssue(
+        'asset-ref',
+        `Entity "${entity.id}" field "${fieldName}" references an asset outside the workspace.`,
+        { entityId: entity.id, fieldName },
+      ),
+      seen,
+    )
+    return
+  }
+  if (!context.assets.some((asset) => resolveScenePath(asset) === resolved)) {
     addSceneIssue(
       issues,
       sceneIssue(
@@ -883,6 +979,7 @@ function validateOwnProps(
   scene: SceneDocument,
   entity: SceneEntity,
   fieldSurface: EntitySurface,
+  scenePath: string | undefined,
   context: SceneValidationContext,
   issues: ValidationIssue[],
   seen: Set<string>,
@@ -920,7 +1017,7 @@ function validateOwnProps(
       checkEntityRef(entity, name, value, scene, issues, seen)
     }
     if (field.field.type === 'assetRef') {
-      validateAsset(entity, name, value, context, issues, seen)
+      validateAsset(entity, name, value, scenePath, context, issues, seen)
     }
   }
   for (const field of fieldSurface.fields) {
@@ -942,6 +1039,7 @@ function validateSceneInstanceProps(
   scene: SceneDocument,
   entity: SceneEntity,
   surface: SceneSurface,
+  scenePath: string | undefined,
   context: SceneValidationContext,
   issues: ValidationIssue[],
   seen: Set<string>,
@@ -979,7 +1077,7 @@ function validateSceneInstanceProps(
       checkEntityRef(entity, name, value, scene, issues, seen)
     }
     if (field.field.type === 'assetRef') {
-      validateAsset(entity, name, value, context, issues, seen)
+      validateAsset(entity, name, value, scenePath, context, issues, seen)
     }
   }
 }
@@ -993,6 +1091,9 @@ export function validateScene(
   const seen = new Set<string>()
   const add = (issue: ValidationIssue) => addSceneIssue(issues, issue, seen)
   const scenePath = path ? normalizeScenePath(path) : undefined
+  if (scenePath && context.scenes[scenePath] !== scene) {
+    context = { ...context, scenes: { ...context.scenes, [scenePath]: scene } }
+  }
 
   if (!scene.id || !scene.id.trim()) {
     add(sceneIssue('scene-id', 'The scene needs a non-empty "id".', { scenePath }))
@@ -1273,13 +1374,13 @@ export function validateScene(
       const effective = effectiveForType(type, context)
       for (const issue of effective.issues) add({ ...issue, entityId: entity.id, scenePath })
       if (isRecord(entity.props ?? {})) {
-        validateOwnProps(scene, entity, effective, context, issues, seen)
+        validateOwnProps(scene, entity, effective, scenePath, context, issues, seen)
       }
       continue
     }
 
-    const sceneRef = normalizeScenePath(entity.scene!)
-    if (/^[a-z][a-z0-9+.-]*:/i.test(entity.scene!) || entity.scene!.startsWith('//')) {
+    const sceneRef = resolveScenePath(entity.scene!, scenePath)
+    if (SCHEME_PATTERN.test(entity.scene!) || entity.scene!.startsWith('//')) {
       add(
         sceneIssue(
           'entity-scene',
@@ -1298,7 +1399,7 @@ export function validateScene(
       )
       continue
     }
-    if (sceneRef.includes('..')) {
+    if (referenceEscapesWorkspace(entity.scene!, scenePath)) {
       add(
         sceneIssue('entity-scene', `Scene instance "${entity.id}" must not traverse outside the workspace.`, {
           entityId: entity.id,
@@ -1343,7 +1444,7 @@ export function validateScene(
     const surface = sceneSurface(target, context, [scene])
     for (const issue of surface.issues) add({ ...issue, scenePath })
     if (isRecord(entity.props ?? {})) {
-      validateSceneInstanceProps(scene, entity, surface, context, issues, seen)
+      validateSceneInstanceProps(scene, entity, surface, scenePath, context, issues, seen)
     }
   }
 
@@ -1431,7 +1532,7 @@ export function validateScene(
         )
         continue
       }
-      const target = context.scenes[normalizeScenePath(parent.scene!)]
+      const target = context.scenes[resolveSceneReference(scene, parent.scene!, context)]
       if (!target) continue
       if (!target.slots?.[entity.slot]) {
         add(
@@ -1454,10 +1555,10 @@ export function validateScene(
   }
 
   const startKey = scenePath ?? normalizeScenePath(scene.id)
-  const walkScenes = (current: SceneDocument, trail: string[]): void => {
+  const walkScenes = (current: SceneDocument, currentKey: string, trail: string[]): void => {
     for (const entity of current.entities) {
       if (!entity.scene) continue
-      const nextKey = normalizeScenePath(entity.scene)
+      const nextKey = resolveScenePath(entity.scene, currentKey)
       if (trail.includes(nextKey)) {
         add(
           sceneIssue('scene-cycle', `Scene reference cycle: ${[...trail, nextKey].join(' → ')}.`, {
@@ -1468,10 +1569,10 @@ export function validateScene(
         continue
       }
       const target = context.scenes[nextKey]
-      if (target) walkScenes(target, [...trail, nextKey])
+      if (target) walkScenes(target, nextKey, [...trail, nextKey])
     }
   }
-  walkScenes(scene, [startKey])
+  walkScenes(scene, startKey, [startKey])
 
   for (const namespace of Object.keys(requirements)) {
     if (!typeNamespaces.has(namespace) && namespace !== context.builtin.namespace) {
@@ -1511,7 +1612,7 @@ export function entityProperties(
     })
   }
   if (entity.scene) {
-    const target = context.scenes[normalizeScenePath(entity.scene)]
+    const target = context.scenes[resolveSceneReference(scene, entity.scene, context)]
     if (!target) return []
     const surface = sceneSurface(target, context)
     return surface.fields.map((field) => {
@@ -1547,7 +1648,7 @@ export function entityEvents(
     }))
   }
   if (entity.scene) {
-    const target = context.scenes[normalizeScenePath(entity.scene)]
+    const target = context.scenes[resolveSceneReference(scene, entity.scene, context)]
     if (!target) return []
     return sceneSurface(target, context).events.map((event) => ({
       name: event.name,
@@ -1605,7 +1706,7 @@ export function addSceneInstance(
   const id = uniqueEntityId(next, base)
   next.entities.push({
     id,
-    scene: displayScenePath(scenePath),
+    scene: normalizeScenePath(scenePath),
     parent: parentId,
     ...(slot ? { slot } : {}),
   })
@@ -1762,7 +1863,7 @@ export function setSceneInstancePath(
   const next = cloneJson(scene)
   const entity = entityById(next, id)
   if (!entity) throw new Error(`Entity "${id}" does not exist.`)
-  entity.scene = displayScenePath(scenePath)
+  entity.scene = normalizeScenePath(scenePath)
   delete entity.type
   delete entity.props
   return next
@@ -1816,7 +1917,7 @@ export function slotNamesForInstance(
   context: SceneValidationContext,
 ): string[] {
   if (!instance.scene) return []
-  const target = context.scenes[normalizeScenePath(instance.scene)]
+  const target = context.scenes[resolveSceneReference(scene, instance.scene, context)]
   return target ? Object.keys(target.slots ?? {}).sort((a, b) => a.localeCompare(b)) : []
 }
 
@@ -2045,7 +2146,7 @@ function resolvedEntityId(
   if (!entity) return null
   const base = scopedId(scope, entity.id)
   if (entity.scene) {
-    const target = context.scenes[normalizeScenePath(entity.scene)]
+    const target = context.scenes[resolveSceneReference(scene, entity.scene, context)]
     if (target) return scopedId(base, target.root)
   }
   return base
@@ -2064,7 +2165,7 @@ function resolvedParentId(
   if (parent.type) return scopedId(scope, parent.id)
   if (parent.scene) {
     if (!entity.slot) return fallbackParent
-    const target = context.scenes[normalizeScenePath(parent.scene)]
+    const target = context.scenes[resolveSceneReference(scene, parent.scene, context)]
     const anchor = target?.slots?.[entity.slot]?.entity
     if (!target || !anchor) return fallbackParent
     return resolvedEntityId(target, anchor, scopedId(scope, parent.id), context) ?? fallbackParent
@@ -2107,6 +2208,10 @@ export function expandScene(
   context: SceneValidationContext,
   scenePath = `/${scene.id}`,
 ): ExpandedScene {
+  const startPath = normalizeScenePath(scenePath)
+  if (context.scenes[startPath] !== scene) {
+    context = { ...context, scenes: { ...context.scenes, [startPath]: scene } }
+  }
   const issues: ValidationIssue[] = []
   const entities: ExpandedEntity[] = []
   const stack: string[] = []
@@ -2160,7 +2265,8 @@ export function expandScene(
     for (const entity of document.entities) {
       if (entity === root) continue
       if (entity.scene) {
-        const target = context.scenes[normalizeScenePath(entity.scene)]
+        const nextKey = resolveScenePath(entity.scene, key)
+        const target = context.scenes[nextKey]
         if (!target) {
           issues.push(
             sceneIssue('missing-scene', `Scene instance "${entity.id}" references a missing scene.`, {
@@ -2174,7 +2280,7 @@ export function expandScene(
         const inherited = overrides.instances[entity.id] ?? {}
         expand(
           target,
-          entity.scene!,
+          nextKey,
           scopedId(scope, entity.id),
           parent,
           normalizeTransform(entity.transform),

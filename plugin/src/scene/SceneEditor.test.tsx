@@ -51,7 +51,7 @@ function levelScene(): SceneDocument {
       { id: 'root', type: 'basic3d:node' },
       {
         id: 'train_1',
-        scene: 'scenes/train.scene.json',
+        scene: '/scenes/train.scene.json',
         parent: 'root',
         transform: { position: [3, 0, 0] },
         props: { power: 2 },
@@ -124,6 +124,15 @@ function mockClient() {
       version: 'v1',
       text: JSON.stringify(levelScene()),
     }),
+    listDirectory: async (path: string) => {
+      if (path === '/assets') {
+        return { entries: [{ path: '/assets/cube.glb', kind: 'file' }] }
+      }
+      if (path === '/scenes') {
+        return { entries: [{ path: '/scenes/train.scene.json', kind: 'file' }] }
+      }
+      return { entries: [] }
+    },
   } as unknown as EditorClient
   return { client, saveHandlers, dirty, requestPanel }
 }
@@ -207,13 +216,32 @@ describe('SceneEditor', () => {
     expect(saved).toContain('game@1.0.0')
   })
 
+  it('organizes the library into Entities, Scenes, and Assets tabs', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    expect(screen.getByRole('button', { name: 'Entities' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Refresh schemas and entities' })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Scenes' }))
+    expect(screen.getByText('/scenes/train.scene.json')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Refresh scene documents' })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Assets' }))
+    expect(screen.getByRole('button', { name: 'Refresh assets' })).toBeTruthy()
+  })
+
+  it('refreshes external resources from the workspace', async () => {
+    const user = userEvent.setup()
+    renderEditor()
+    await user.click(screen.getByRole('button', { name: 'Refresh schemas and entities' }))
+    expect(await screen.findByText('Refreshed workspace resources')).toBeTruthy()
+  })
+
   it('places a glb asset as a mesh entity', async () => {
     const user = userEvent.setup()
     const { saveHandlers } = renderEditor()
     await user.click(screen.getByRole('button', { name: 'Assets' }))
     await user.click(await screen.findByRole('button', { name: 'Place' }))
     expect((await screen.findAllByText('mesh_1')).length).toBeGreaterThan(0)
-    expect(saveHandlers[0]().text).toContain('"mesh": "assets/cube.glb"')
+    expect(saveHandlers[0]().text).toContain('"mesh": "/assets/cube.glb"')
   })
 
   it('disables editing in a read-only workspace', () => {

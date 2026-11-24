@@ -10,7 +10,7 @@
     {
       "id": "train_1",
       "name": "Train",
-      "scene": "scenes/train.scene.json",
+      "scene": "/scenes/train.scene.json",
       "parent": "root",
       "transform": {
         "position": [0, 0, 0],

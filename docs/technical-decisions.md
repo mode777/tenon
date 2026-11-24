@@ -259,11 +259,18 @@ A scene document is an entity tree:
 ```json
 {
   "id": "door_1",
-  "scene": "scenes/door.scene.json",
+  "scene": "/scenes/door.scene.json",
   "transform": { "position": [3, 0, 0] },
   "props": { "openAmount": 0.5 }
 }
 ```
+
+- External references (`scene` and `assetRef`) are either workspace-absolute, with a
+  leading `/` (`/scenes/door.scene.json`, `/assets/door.glb`), or relative to the
+  containing scene (`door.scene.json`, `../assets/door.glb`). A bare
+  `assets/door.glb` in `/scenes/house.scene.json` resolves to
+  `/scenes/assets/door.glb`, not `/assets/door.glb`. References never climb above the
+  workspace root.
 
 - A scene instance's transform places the referenced scene. The scene root's transform remains relative to the instance.
 - At build time, scene-instance boundaries and slot names are resolved into concrete parent links. The runtime entity tree keeps those parent links and local transforms (TD-23).
@@ -400,13 +407,15 @@ An entity references a generator instance:
 
 ## TD-12 — Authoring format
 
-Authoring data is JSON. Local files use relative paths; schema imports may also resolve builtin or remote locations.
+Authoring data is JSON. Local file locations are project-relative; schema imports may also resolve builtin or remote locations. External scene and asset references follow TD-07.
 
 - Project manifest: `project.json`.
 - Project schema bundles: `schemas/*.schema.json`; bundles declare package imports and the project import map resolves their locations (TD-25, TD-29).
 - Scene documents: `scenes/*.scene.json`, `levels/*.scene.json`.
 - Generator definitions: `generators/<name>/generator.json` plus script/graph files.
-- Assets: `assets/`, referenced from entity `assetRef` fields by relative path.
+- Assets: `assets/`, referenced from entity `assetRef` fields by a workspace-absolute
+  path (`/assets/foo.glb`) or a scene-relative path (`../assets/foo.glb`); the editor
+  writes the workspace-absolute form when picking from the asset list.
 - Entity transforms live on the entity instance outside `props`; omitted components default to identity.
 - No authoring file contains baked meshes, lightmaps, or generated geometry.
 - IDs are stable and local. Names are display labels.
@@ -958,7 +967,7 @@ bottom Inspection panel are Exo shell panels, not iframes inside the scene edito
 - Panels load the workspace read-only for schema, asset, scene, and validation context.
   The editor snapshot is the document source; local events are at-most-once, so a panel
   requests a fresh snapshot on mount and whenever the active editor changes.
-- The scene frame keeps the hierarchy, palette/assets, viewport, toolbar, and save
+- The scene frame keeps the hierarchy, entity/scene/asset library, viewport, toolbar, and save
   notices. The project hub remains the only project-level panel. A panel shows an empty
   state when no Tenon scene/level editor is active, including when the active editor is a
   project or schema editor.

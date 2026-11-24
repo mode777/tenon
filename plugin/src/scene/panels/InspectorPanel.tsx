@@ -9,7 +9,9 @@ import {
   entityProperties,
   entitySubtree,
   enumForField,
+  normalizeScenePath,
   normalizeTransform,
+  resolveScenePath,
   slotNamesForInstance,
   type EntityProperty,
   type SceneDocument,
@@ -114,18 +116,26 @@ function JsonPreview({ value }: { value: unknown }) {
 function FieldValueEditor({
   prop,
   scene,
+  scenePath,
   entityId,
   context,
   assets,
+  assetsKnown,
+  refreshing,
   disabled,
+  onRefresh,
   onChange,
 }: {
   prop: EntityProperty
   scene: SceneDocument
+  scenePath: string
   entityId: string
   context: SceneValidationContext
   assets: string[]
+  assetsKnown: boolean
+  refreshing?: boolean
   disabled: boolean
+  onRefresh?: () => void
   onChange: (value: unknown) => void
 }) {
   const field = prop.field
@@ -200,33 +210,53 @@ function FieldValueEditor({
   }
   if (field.type === 'assetRef') {
     const current = typeof prop.value === 'string' ? prop.value : ''
-    const normalized = current ? displayScenePath(current) : ''
-    const missing =
-      normalized && !assets.some((asset) => displayScenePath(asset) === normalized)
-    if (assets.length === 0) {
+    const resolved = current ? resolveScenePath(current, scenePath) : ''
+    const options = assets.map((asset) => normalizeScenePath(asset))
+    const known = resolved ? options.includes(resolved) : false
+    const refreshButton = (
+      <button
+        type="button"
+        className="button tiny ghost scene-refresh"
+        title="Refresh assets"
+        aria-label="Refresh assets"
+        disabled={refreshing}
+        onClick={() => onRefresh?.()}
+      >
+        {refreshing ? '…' : '↻'}
+      </button>
+    )
+    if (!assetsKnown) {
       return (
-        <TextInput
-          value={current}
-          placeholder="assets/…"
-          disabled={disabled}
-          onChange={(value) => onChange(value || null)}
-        />
+        <div className="scene-ref-field">
+          <TextInput
+            value={current}
+            placeholder="/assets/…"
+            ariaLabel="Asset path"
+            disabled={disabled}
+            onChange={(value) => onChange(value || null)}
+          />
+          {refreshButton}
+        </div>
       )
     }
     return (
-      <select
-        value={current}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value || null)}
-      >
-        <option value="">—</option>
-        {missing && <option value={current}>{current} (missing)</option>}
-        {assets.map((asset) => (
-          <option key={asset} value={displayScenePath(asset)}>
-            {displayScenePath(asset)}
-          </option>
-        ))}
-      </select>
+      <div className="scene-ref-field">
+        <select
+          aria-label="Asset"
+          value={known ? resolved : current}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value || null)}
+        >
+          <option value="">—</option>
+          {current && !known && <option value={current}>{current} (missing)</option>}
+          {options.map((asset) => (
+            <option key={asset} value={asset}>
+              {displayScenePath(asset)}
+            </option>
+          ))}
+        </select>
+        {refreshButton}
+      </div>
     )
   }
   if (field.type === 'color' || field.type === 'vec2' || field.type === 'vec3') {
@@ -350,21 +380,29 @@ function SceneSettings({
 
 function EntityInspector({
   scene,
+  scenePath,
   entity,
   context,
   assets,
+  assetsKnown,
+  refreshing,
   canWrite,
   parentOptions,
   sceneOptions: instanceOptions,
+  onRefresh,
   onCommand,
 }: {
   scene: SceneDocument
+  scenePath: string
   entity: SceneEntity
   context: SceneValidationContext
   assets: string[]
+  assetsKnown: boolean
+  refreshing?: boolean
   canWrite: boolean
   parentOptions: SceneEntity[]
   sceneOptions: Array<{ path: string; label: string }>
+  onRefresh?: () => void
   onCommand: (command: SceneCommand) => void
 }) {
   const properties = useMemo(
@@ -378,14 +416,15 @@ function EntityInspector({
   const transform = normalizeTransform(entity.transform)
   const definitionOptions = useMemo(() => concreteDefinitions(context), [context])
   const sceneChoices = useMemo(() => {
-    if (!entity.scene) return instanceOptions
-    const current = displayScenePath(entity.scene)
-    if (instanceOptions.some((option) => option.path === `/${current}`)) return instanceOptions
+    const currentRef = entity.scene ? resolveScenePath(entity.scene, scenePath) : ''
+    if (!currentRef) return instanceOptions
+    if (instanceOptions.some((option) => option.path === currentRef)) return instanceOptions
     return [
       ...instanceOptions,
-      { path: `/${current}`, label: `${current} (missing)` },
+      { path: currentRef, label: `${displayScenePath(currentRef)} (missing)` },
     ].sort((a, b) => a.path.localeCompare(b.path))
-  }, [entity.scene, instanceOptions])
+  }, [entity.scene, instanceOptions, scenePath])
+  const currentSceneRef = entity.scene ? resolveScenePath(entity.scene, scenePath) : ''
   const isRoot = entity.id === scene.root
 
   return (
@@ -430,24 +469,36 @@ function EntityInspector({
         {entity.scene ? (
           <label className="scene-field">
             <span>Scene</span>
-            <select
-              aria-label="Scene document"
-              value={displayScenePath(entity.scene)}
-              disabled={!canWrite}
-              onChange={(event) =>
-                onCommand({
-                  type: 'set-entity-scene',
-                  entityId: entity.id,
-                  value: event.target.value,
-                })
-              }
-            >
-              {sceneChoices.map((option) => (
-                <option key={option.path} value={displayScenePath(option.path)}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <div className="scene-ref-field">
+              <select
+                aria-label="Scene document"
+                value={currentSceneRef}
+                disabled={!canWrite}
+                onChange={(event) =>
+                  onCommand({
+                    type: 'set-entity-scene',
+                    entityId: entity.id,
+                    value: event.target.value,
+                  })
+                }
+              >
+                {sceneChoices.map((option) => (
+                  <option key={option.path} value={option.path}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="button tiny ghost scene-refresh"
+                title="Refresh scenes"
+                aria-label="Refresh scenes"
+                disabled={refreshing}
+                onClick={() => onRefresh?.()}
+              >
+                {refreshing ? '…' : '↻'}
+              </button>
+            </div>
           </label>
         ) : (
           <label className="scene-field">
@@ -627,10 +678,14 @@ function EntityInspector({
                 <FieldValueEditor
                   prop={prop}
                   scene={scene}
+                  scenePath={scenePath}
                   entityId={entity.id}
                   context={context}
                   assets={assets}
+                  assetsKnown={assetsKnown}
+                  refreshing={refreshing}
                   disabled={!canWrite}
+                  onRefresh={onRefresh}
                   onChange={(value) =>
                     onCommand({
                       type: 'set-prop',
@@ -686,6 +741,8 @@ export interface InspectorPanelProps {
   context: SceneValidationContext
   workspace: LoadedWorkspace
   canWrite: boolean
+  refreshing?: boolean
+  onRefresh?: () => void
   onSelect: (id: string | null) => void
   onCommand: (command: SceneCommand) => void
 }
@@ -697,6 +754,8 @@ export function InspectorPanel({
   context,
   workspace,
   canWrite,
+  refreshing,
+  onRefresh,
   onSelect,
   onCommand,
 }: InspectorPanelProps) {
@@ -726,12 +785,16 @@ export function InspectorPanel({
           <EntityInspector
             key={selectedEntity.id}
             scene={doc}
+            scenePath={path}
             entity={selectedEntity}
             context={context}
             assets={workspace.assets}
+            assetsKnown={workspace.assetsKnown}
+            refreshing={refreshing}
             canWrite={canWrite}
             parentOptions={parentOptions}
             sceneOptions={instanceScenes}
+            onRefresh={onRefresh}
             onCommand={onCommand}
           />
         ) : (

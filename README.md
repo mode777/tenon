@@ -49,7 +49,7 @@ Point a workspace's `exo.json` at `http://localhost:5175/exo-manifest.json` whil
 
 ## Status
 
-M1 and M2 are implemented. The plugin ships a project hub, New Schema and New Scene commands, the schema editor, the project import-map editor with project-wide validation, and the scene/level editor with a three.js viewport, hierarchy, shell-hosted Inspector and Inspection panels, palette, asset browser, scene instances, direct-child field promotions, slots, attachments, undo/redo, and save/conflict handling. The scene panels follow the active editor through Exo 0.10.0's active-editor context and a plugin-local snapshot/command bridge. The design docs remain the source of truth for the later events, generators, lightmap, and runtime-build milestones.
+M1 and M2 are implemented. The plugin ships a project hub, New Schema and New Scene commands, the schema editor, the project import-map editor with project-wide validation, and the scene/level editor with a three.js viewport, hierarchy, shell-hosted Inspector and Inspection panels, entity and scene palettes, asset browser, scene instances, direct-child field promotions, slots, attachments, undo/redo, and save/conflict handling. The scene panels follow the active editor through Exo 0.10.0's active-editor context and a plugin-local snapshot/command bridge. The design docs remain the source of truth for the later events, generators, lightmap, and runtime-build milestones.
 
 ## Repository layout
 

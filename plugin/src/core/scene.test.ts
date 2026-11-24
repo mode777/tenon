@@ -14,6 +14,8 @@ import {
   expandScene,
   normalizeTransform,
   parseSceneText,
+  referenceEscapesWorkspace,
+  resolveScenePath,
   sceneSurface,
   sceneToText,
   setEntityParent,
@@ -83,7 +85,7 @@ function levelScene(): SceneDocument {
       { id: 'root', type: 'basic3d:node' },
       {
         id: 'train_1',
-        scene: 'scenes/train.scene.json',
+        scene: '../scenes/train.scene.json',
         parent: 'root',
         transform: { position: [3, 0, 0] },
         props: { power: 2 },
@@ -92,6 +94,45 @@ function levelScene(): SceneDocument {
     ],
   }
 }
+
+describe('external references', () => {
+  it('resolves workspace-absolute and scene-relative paths', () => {
+    const scenePath = '/scenes/one.scene.json'
+    expect(resolveScenePath('/assets/cube.glb', scenePath)).toBe('/assets/cube.glb')
+    expect(resolveScenePath('cube.glb', scenePath)).toBe('/scenes/cube.glb')
+    expect(resolveScenePath('../assets/cube.glb', scenePath)).toBe('/assets/cube.glb')
+    expect(referenceEscapesWorkspace('../assets/cube.glb', scenePath)).toBe(false)
+    expect(referenceEscapesWorkspace('../../assets/cube.glb', scenePath)).toBe(true)
+  })
+
+  it('validates scene-relative asset and scene references', () => {
+    const assetScene: SceneDocument = {
+      id: 'scene_assets',
+      requires: ['basic3d@1.0.0'],
+      root: 'root',
+      entities: [
+        { id: 'root', type: 'basic3d:node' },
+        {
+          id: 'mesh',
+          type: 'basic3d:mesh',
+          parent: 'root',
+          props: { mesh: '../assets/cube.glb' },
+        },
+      ],
+    }
+    expect(
+      validateScene(assetScene, context(), '/scenes/assets.scene.json').errors,
+    ).toBe(0)
+    const level = levelScene()
+    expect(
+      validateScene(
+        level,
+        context({ '/scenes/train.scene.json': trainScene() }),
+        '/levels/level01.scene.json',
+      ).errors,
+    ).toBe(0)
+  })
+})
 
 describe('scene document', () => {
   it('creates and round-trips the default scene', () => {
@@ -244,7 +285,7 @@ describe('scene composition', () => {
       root: 'root',
       entities: [
         { id: 'root', type: 'basic3d:node' },
-        { id: 'b', scene: 'scenes/b.scene.json', parent: 'root' },
+        { id: 'b', scene: 'b.scene.json', parent: 'root' },
       ],
     }
     const b: SceneDocument = {
@@ -253,7 +294,7 @@ describe('scene composition', () => {
       root: 'root',
       entities: [
         { id: 'root', type: 'basic3d:node' },
-        { id: 'a', scene: 'scenes/a.scene.json', parent: 'root' },
+        { id: 'a', scene: 'a.scene.json', parent: 'root' },
       ],
     }
     const issues = validateScene(
@@ -296,7 +337,7 @@ describe('scene editing', () => {
     const scene = createEmptyScene()
     const withInstance = addSceneInstance(scene, 'scenes/train.scene.json')
     expect(withInstance.scene.entities.at(-1)).toMatchObject({
-      scene: 'scenes/train.scene.json',
+      scene: '/scenes/train.scene.json',
       parent: 'root',
     })
     const withSlot = addSlot(withInstance.scene, 'button_0', withInstance.id)

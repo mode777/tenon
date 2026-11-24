@@ -1,9 +1,33 @@
 import type { ViewClient } from '@exo/plugin-sdk'
-import type { LoadedWorkspace } from '../../core/workspace'
+import { useCallback, useRef, useState } from 'react'
+import { loadWorkspace, type LoadedWorkspace } from '../../core/workspace'
 import { sceneValidationContext, isSceneEditorPath } from '../scene-workspace'
 import { InspectionPanel } from './InspectionPanel'
 import { InspectorPanel } from './InspectorPanel'
 import { useScenePanel } from './useScenePanel'
+
+function useRefreshableWorkspace(view: ViewClient, initial: LoadedWorkspace) {
+  const [workspace, setWorkspace] = useState(initial)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const busy = useRef(false)
+  const refresh = useCallback(() => {
+    if (busy.current) return
+    busy.current = true
+    setRefreshing(true)
+    setError(null)
+    void loadWorkspace(view)
+      .then((next) => setWorkspace(next))
+      .catch((cause: unknown) =>
+        setError(cause instanceof Error ? cause.message : String(cause)),
+      )
+      .finally(() => {
+        busy.current = false
+        setRefreshing(false)
+      })
+  }, [view])
+  return { workspace, refresh, refreshing, error, clearError: () => setError(null) }
+}
 
 function PanelError({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
@@ -46,11 +70,15 @@ function PanelLoading() {
 
 export function InspectorPanelRoot({
   view,
-  workspace,
+  workspace: initialWorkspace,
 }: {
   view: ViewClient
   workspace: LoadedWorkspace
 }) {
+  const { workspace, refresh, refreshing, error, clearError } = useRefreshableWorkspace(
+    view,
+    initialWorkspace,
+  )
   const panel = useScenePanel(view)
   const editor = panel.activeEditor
   const isScene = editor ? isSceneEditorPath(editor.path) : false
@@ -62,6 +90,7 @@ export function InspectorPanelRoot({
   return (
     <div className="scene-panel-frame">
       {panel.error && <PanelError message={panel.error} onDismiss={panel.clearError} />}
+      {error && <PanelError message={error} onDismiss={clearError} />}
       {!isScene ? (
         <PanelEmpty activePath={editor?.path} />
       ) : panel.snapshot && context ? (
@@ -73,6 +102,8 @@ export function InspectorPanelRoot({
           context={context}
           workspace={workspace}
           canWrite={panel.snapshot.canWrite}
+          refreshing={refreshing}
+          onRefresh={refresh}
           onSelect={(entityId) => panel.sendCommand({ type: 'select', entityId })}
           onCommand={panel.sendCommand}
         />

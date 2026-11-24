@@ -446,6 +446,37 @@ input[type='checkbox'] {
   width: 100%;
 }
 
+.scene-library-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scene-library-tools .scene-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.scene-refresh {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  line-height: 1.1;
+}
+
+.scene-ref-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.scene-ref-field input,
+.scene-ref-field select {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
 .scene-palette-group h3,
 .scene-section h3,
 .scene-public-grid h3,

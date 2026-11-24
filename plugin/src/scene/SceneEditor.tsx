@@ -21,6 +21,7 @@ import {
   type SceneDocument,
 } from '../core/scene'
 import type { LoadedWorkspace } from '../core/workspace'
+import { loadWorkspace } from '../core/workspace'
 import { applySceneCommand, type SceneCommand } from './scene-commands'
 import {
   concreteDefinitions,
@@ -32,7 +33,7 @@ import { useScenePanelBridge } from './useScenePanelBridge'
 import type { SceneViewportProps, TransformMode } from './Viewport'
 import './scene.css'
 
-type SidebarTab = 'palette' | 'assets'
+type SidebarTab = 'entities' | 'scenes' | 'assets'
 
 interface Toast {
   kind: 'notice' | 'error'
@@ -61,18 +62,22 @@ export function SceneEditor({
   scenePath,
   levelMode,
   canWrite,
-  workspace,
+  workspace: initialWorkspace,
   Viewport,
 }: SceneEditorProps) {
   const history = useHistory(initialDoc, cloneJson)
   const doc = history.state.doc
   const [savedText, setSavedText] = useState(() => sceneToText(initialDoc))
   const [selection, setSelection] = useState<string | null>(initialDoc.root)
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('palette')
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('entities')
   const [mode, setMode] = useState<TransformMode>('translate')
   const [snap, setSnap] = useState(false)
   const [search, setSearch] = useState('')
+  const [sceneSearch, setSceneSearch] = useState('')
   const [assetSearch, setAssetSearch] = useState('')
+  const [workspace, setWorkspace] = useState(initialWorkspace)
+  const [refreshing, setRefreshing] = useState(false)
+  const refreshingRef = useRef(false)
   const [toast, setToast] = useState<Toast | null>(null)
   const [external, setExternal] = useState<FileChangedPayload | null>(null)
   const [pathVersion, setPathVersion] = useState(0)
@@ -116,10 +121,10 @@ export function SceneEditor({
     )
   }, [paletteDefinitions, search])
   const filteredScenes = useMemo(() => {
-    const query = search.trim().toLowerCase()
+    const query = sceneSearch.trim().toLowerCase()
     if (!query) return instanceScenes
     return instanceScenes.filter((scene) => scene.path.toLowerCase().includes(query))
-  }, [instanceScenes, search])
+  }, [instanceScenes, sceneSearch])
   const filteredAssets = useMemo(() => {
     const query = assetSearch.trim().toLowerCase()
     const assets = workspace.assets
@@ -137,6 +142,21 @@ export function SceneEditor({
   }
   const showNotice = (message: string) => {
     setToast({ kind: 'notice', message })
+  }
+
+  const refreshWorkspace = async () => {
+    if (refreshingRef.current) return
+    refreshingRef.current = true
+    setRefreshing(true)
+    try {
+      setWorkspace(await loadWorkspace(client))
+      showNotice('Refreshed workspace resources')
+    } catch (error) {
+      showError(error)
+    } finally {
+      refreshingRef.current = false
+      setRefreshing(false)
+    }
   }
 
   const commit = (next: SceneDocument) => {
@@ -274,7 +294,7 @@ export function SceneEditor({
   const addAsset = (asset: string) => {
     try {
       const added = addEntity(doc, 'basic3d:mesh', creationParentId)
-      const withAsset = setEntityProp(added.scene, added.id, 'mesh', displayScenePath(asset))
+      const withAsset = setEntityProp(added.scene, added.id, 'mesh', normalizeScenePath(asset))
       commit(withAsset)
       setSelection(added.id)
       showNotice(`Placed ${displayScenePath(asset)}`)
@@ -511,10 +531,17 @@ export function SceneEditor({
             <div className="scene-panel-tabs">
               <button
                 type="button"
-                className={sidebarTab === 'palette' ? 'active' : ''}
-                onClick={() => setSidebarTab('palette')}
+                className={sidebarTab === 'entities' ? 'active' : ''}
+                onClick={() => setSidebarTab('entities')}
               >
-                Palette
+                Entities
+              </button>
+              <button
+                type="button"
+                className={sidebarTab === 'scenes' ? 'active' : ''}
+                onClick={() => setSidebarTab('scenes')}
+              >
+                Scenes
               </button>
               <button
                 type="button"
@@ -524,73 +551,115 @@ export function SceneEditor({
                 Assets
               </button>
             </div>
-            {sidebarTab === 'palette' ? (
+            {sidebarTab === 'entities' && (
               <div className="scene-library-body">
-                <input
-                  type="search"
-                  className="scene-search"
-                  placeholder="Search definitions and scenes"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-                <div className="scene-palette-group">
-                  <h3>Entities</h3>
-                  {filteredDefinitions.length === 0 ? (
-                    <p className="scene-empty-note">
-                      No concrete definitions. Add one in a schema bundle required by this scene.
-                    </p>
-                  ) : (
-                    <ul className="scene-palette-list">
-                      {filteredDefinitions.map((definition) => (
-                        <li key={definition.type}>
-                          <button
-                            type="button"
-                            className="scene-palette-item"
-                            disabled={!canWrite}
-                            onClick={() => addDefinitionEntity(definition.type)}
-                            title={definition.doc}
-                          >
-                            <span>{definition.type}</span>
-                            <small>{definition.namespace}</small>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                <div className="scene-library-tools">
+                  <input
+                    type="search"
+                    className="scene-search"
+                    placeholder="Search definitions"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="button tiny ghost scene-refresh"
+                    title="Refresh schemas and entities"
+                    aria-label="Refresh schemas and entities"
+                    disabled={refreshing}
+                    onClick={() => void refreshWorkspace()}
+                  >
+                    {refreshing ? '…' : '↻'}
+                  </button>
                 </div>
-                <div className="scene-palette-group">
-                  <h3>Scene instances</h3>
-                  {filteredScenes.length === 0 ? (
-                    <p className="scene-empty-note">No other scene documents.</p>
-                  ) : (
-                    <ul className="scene-palette-list">
-                      {filteredScenes.map((scene) => (
-                        <li key={scene.path}>
-                          <button
-                            type="button"
-                            className="scene-palette-item"
-                            disabled={!canWrite}
-                            onClick={() => addInstance(scene.path)}
-                          >
-                            <span>{sceneFileName(scene.path)}</span>
-                            <small>{scene.path}</small>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                {filteredDefinitions.length === 0 ? (
+                  <p className="scene-empty-note">
+                    No concrete definitions. Add one in a schema bundle required by this scene.
+                  </p>
+                ) : (
+                  <ul className="scene-palette-list">
+                    {filteredDefinitions.map((definition) => (
+                      <li key={definition.type}>
+                        <button
+                          type="button"
+                          className="scene-palette-item"
+                          disabled={!canWrite}
+                          onClick={() => addDefinitionEntity(definition.type)}
+                          title={definition.doc}
+                        >
+                          <span>{definition.type}</span>
+                          <small>{definition.namespace}</small>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            ) : (
+            )}
+            {sidebarTab === 'scenes' && (
               <div className="scene-library-body">
-                <input
-                  type="search"
-                  className="scene-search"
-                  placeholder="Search assets"
-                  value={assetSearch}
-                  onChange={(event) => setAssetSearch(event.target.value)}
-                />
-                {!client.capabilities.directoryListing && (
+                <div className="scene-library-tools">
+                  <input
+                    type="search"
+                    className="scene-search"
+                    placeholder="Search scenes"
+                    value={sceneSearch}
+                    onChange={(event) => setSceneSearch(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="button tiny ghost scene-refresh"
+                    title="Refresh scene documents"
+                    aria-label="Refresh scene documents"
+                    disabled={refreshing}
+                    onClick={() => void refreshWorkspace()}
+                  >
+                    {refreshing ? '…' : '↻'}
+                  </button>
+                </div>
+                {filteredScenes.length === 0 ? (
+                  <p className="scene-empty-note">No other scene documents.</p>
+                ) : (
+                  <ul className="scene-palette-list">
+                    {filteredScenes.map((scene) => (
+                      <li key={scene.path}>
+                        <button
+                          type="button"
+                          className="scene-palette-item"
+                          disabled={!canWrite}
+                          onClick={() => addInstance(scene.path)}
+                        >
+                          <span>{sceneFileName(scene.path)}</span>
+                          <small>{scene.path}</small>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {sidebarTab === 'assets' && (
+              <div className="scene-library-body">
+                <div className="scene-library-tools">
+                  <input
+                    type="search"
+                    className="scene-search"
+                    placeholder="Search assets"
+                    value={assetSearch}
+                    onChange={(event) => setAssetSearch(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="button tiny ghost scene-refresh"
+                    title="Refresh assets"
+                    aria-label="Refresh assets"
+                    disabled={refreshing}
+                    onClick={() => void refreshWorkspace()}
+                  >
+                    {refreshing ? '…' : '↻'}
+                  </button>
+                </div>
+                {!workspace.assetsKnown && (
                   <p className="scene-empty-note">
                     Directory listing is unavailable in this shell. Asset paths can still be typed.
                   </p>

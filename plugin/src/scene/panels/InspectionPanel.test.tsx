@@ -33,7 +33,7 @@ describe('InspectionPanel', () => {
   it('lists validation issues and selects the entity', async () => {
     const user = userEvent.setup()
     const doc = levelScene()
-    doc.entities[1].scene = 'scenes/missing.scene.json'
+    doc.entities[1].scene = '/scenes/missing.scene.json'
     const { onSelect } = renderInspection(doc)
 
     expect(await screen.findByText(/missing-scene/)).toBeTruthy()

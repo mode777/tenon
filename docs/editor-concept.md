@@ -177,7 +177,8 @@ Generators are parameterized asset sources.
 
 An imported mesh file such as `.glb` is an **asset**, not an entity. The file lives
 under `assets/` and is available to `assetRef` fields; it does not create scene
-nodes.
+nodes. An `assetRef` stores either a workspace-absolute path (`/assets/foo.glb`) or
+a path relative to the containing scene (`../assets/foo.glb`).
 
 The Exo shell owns the workspace. The user adds the file to `assets/` in the
 workspace folder; the editor browses and selects it. The Tenon plugin never copies
@@ -218,7 +219,7 @@ The plugin contributes one visible frame editor per authoring format:
 |---|---|---|
 | **Project** | `project.json` | Import map, resolved schema versions, project-wide validation, build readiness |
 | **Schema** | `schemas/*.schema.json` | Definition tree, composition, fields, enums, defaults, events, read-only builtins |
-| **Scene** | `scenes/*.scene.json`, `levels/*.scene.json` | Hierarchy, 3D viewport, palette, shell Inspector/Inspection panels, promotions, slots |
+| **Scene** | `scenes/*.scene.json`, `levels/*.scene.json` | Hierarchy, 3D viewport, entity/scene/asset library, shell Inspector/Inspection panels, promotions, slots |
 | **Generator** | `generators/*/generator.json` | Parameter form, seed, preview, bake settings |
 
 A level is a scene document used as the top-level world, so it opens in the scene
@@ -339,11 +340,16 @@ A scene instance uses `scene` instead of `type`:
 ```json
 {
   "id": "door_1",
-  "scene": "scenes/door.scene.json",
+  "scene": "/scenes/door.scene.json",
   "transform": { "position": [3, 0, 0] },
   "props": { "openAmount": 0.5 }
 }
 ```
+
+Scene and `assetRef` references are either workspace-absolute (`/scenes/…`,
+`/assets/…`) or relative to the containing scene (`../assets/…`). The scene editor
+writes the workspace-absolute form when picking from the scene or asset list and
+resolves both forms when loading.
 
 The root and `handle_anchor` omit transforms, so they use identity transforms. The scene
 instance transform places the whole door scene.

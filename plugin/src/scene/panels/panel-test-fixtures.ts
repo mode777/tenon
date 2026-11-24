@@ -48,7 +48,7 @@ export function levelScene(): SceneDocument {
       { id: 'root', type: 'basic3d:node' },
       {
         id: 'train_1',
-        scene: 'scenes/train.scene.json',
+        scene: '/scenes/train.scene.json',
         parent: 'root',
         transform: { position: [3, 0, 0] },
         props: { power: 2 },

@@ -24,7 +24,7 @@ Tenon SDK 1.10.0 contract.
 
 ### Layout
 
-The scene frame owns the document surface: toolbar, hierarchy, palette/assets, viewport,
+The scene frame owns the document surface: toolbar, hierarchy, library, viewport,
 and save/conflict notices. The Inspector and Inspection surfaces are Exo shell panels, not
 iframes inside the scene frame.
 
@@ -32,10 +32,18 @@ iframes inside the scene frame.
   Inspector/Inspection actions with the validation count.
 - **Hierarchy:** the host scene tree. Scene instance internals are not listed; a scene
   instance is one atomic node. Host attachments appear under their instance.
-- **Palette:** concrete definitions from the available schemas and scene documents that
-  can be instanced. Placing a definition from another namespace adds its exact
-  `namespace@version` requirement to the scene. Abstract definitions never appear.
-- **Assets:** files under `assets/`. A `.glb` can be placed as a `basic3d:mesh` entity.
+- **Library:** three tabs in the lower-left panel.
+  - **Entities:** concrete definitions from the available schemas. Placing a definition
+    from another namespace adds its exact `namespace@version` requirement to the scene.
+    Abstract definitions never appear.
+  - **Scenes:** other scene documents that can be instanced.
+  - **Assets:** files under `assets/`. A `.glb` can be placed as a `basic3d:mesh` entity.
+  Each tab has a refresh action that reloads schemas, scenes, and assets from the
+  workspace, so files added outside the editor appear without reopening it.
+- **External references:** `scene` and `assetRef` paths are stored workspace-absolute
+  (`/scenes/train.scene.json`, `/assets/cube.glb`) when picked from a library list, and
+  are also resolved relative to the containing scene (`../assets/cube.glb`). The
+  Inspector shows a refresh action next to the scene and `assetRef` pickers.
 - **Viewport:** three.js through React Three Fiber and drei, with a grid, transform
   controls, and a camera gizmo.
 - **Inspector:** the `tenon.scene.inspector` secondary shell panel. It shows
@@ -98,8 +106,8 @@ CLI/CI concern.
 ## M2 scope
 
 Included: project import map, project-wide validation, New Scene, scene/level editing,
-three.js viewport, schema-generated Inspector and Inspection shell panels, palette, asset
-placement, scene instances, direct-child field and event promotions, slots, host
+three.js viewport, schema-generated Inspector and Inspection shell panels, entity and scene
+palettes, asset placement, scene instances, direct-child field and event promotions, slots, host
 attachments, input entity refs, undo/redo, and debug expansion.
 
 Not included: events runtime harness, generators, build/bake, lightmaps, 2D orthographic
