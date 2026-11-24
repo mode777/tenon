@@ -64,6 +64,7 @@ export function useScenePanelBridge(options: ScenePanelBridgeOptions): ScenePane
   const revisionRef = useRef(0)
   const reportedErrorRef = useRef<string | null>(null)
   const revealedRef = useRef(false)
+  const activeRef = useRef(true)
 
   const reportError = useCallback((message: string) => {
     if (reportedErrorRef.current === message) return
@@ -114,6 +115,21 @@ export function useScenePanelBridge(options: ScenePanelBridgeOptions): ScenePane
     [instanceId],
   )
 
+  const publishOnline = useCallback(
+    (active: boolean) => {
+      if (!instanceId) return
+      void optionsRef.current.client
+        .publishLocal(SCENE_PANEL_TOPIC, {
+          kind: 'editor-online',
+          path: stateRef.current.scenePath,
+          instanceId,
+          active,
+        })
+        .catch(() => undefined)
+    },
+    [instanceId],
+  )
+
   useEffect(() => {
     if (!instanceId) return
     const client = optionsRef.current.client
@@ -122,6 +138,10 @@ export function useScenePanelBridge(options: ScenePanelBridgeOptions): ScenePane
       const message = event.payload
       if (message.kind === 'snapshot-request' && message.target === instanceId) {
         publishCurrentSnapshot()
+        return
+      }
+      if (message.kind === 'discover') {
+        if (activeRef.current) publishOnline(true)
         return
       }
       if (message.kind !== 'command' || message.target !== instanceId) return
@@ -144,6 +164,7 @@ export function useScenePanelBridge(options: ScenePanelBridgeOptions): ScenePane
     })
     void client
       .subscribeLocal(SCENE_PANEL_TOPIC)
+      .then(() => publishOnline(activeRef.current))
       .catch((error: unknown) =>
         reportError(`Could not subscribe the scene panels: ${errorMessage(error)}`),
       )
@@ -151,7 +172,14 @@ export function useScenePanelBridge(options: ScenePanelBridgeOptions): ScenePane
       off()
       client.unsubscribe(SCENE_PANEL_TOPIC)
     }
-  }, [instanceId, publishCurrentSnapshot, publishResult, publishSnapshot, reportError])
+  }, [
+    instanceId,
+    publishCurrentSnapshot,
+    publishOnline,
+    publishResult,
+    publishSnapshot,
+    reportError,
+  ])
 
   useEffect(() => {
     if (!instanceId) return
@@ -208,13 +236,15 @@ export function useScenePanelBridge(options: ScenePanelBridgeOptions): ScenePane
     }
     void reveal()
     const off = client.onEvent('editor/active', (event) => {
-      if (
-        event.payload.active &&
-        event.payload.instanceId === instanceId &&
-        !revealedRef.current
-      ) {
-        void reveal()
+      const own = event.payload.active && event.payload.instanceId === instanceId
+      if (!event.payload.active || !own) {
+        activeRef.current = false
+        publishOnline(false)
+        return
       }
+      activeRef.current = true
+      publishOnline(true)
+      if (!revealedRef.current) void reveal()
     })
     void client.subscribe('editor/active').catch(() => undefined)
     return () => {
@@ -222,7 +252,7 @@ export function useScenePanelBridge(options: ScenePanelBridgeOptions): ScenePane
       off()
       client.unsubscribe('editor/active')
     }
-  }, [instanceId])
+  }, [instanceId, publishOnline])
 
   return { revealInspector, revealInspection }
 }

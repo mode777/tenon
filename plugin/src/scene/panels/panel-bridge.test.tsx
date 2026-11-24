@@ -77,18 +77,21 @@ function BridgeHarness({
   return null
 }
 
-function fakeViewClient() {
+function fakeViewClient(
+  activeEditor: ViewClient['activeEditor'] = {
+    pluginId: 'com.tenon.editor',
+    path: '/levels/level01.scene.json',
+    instanceId: 'editor-1',
+  },
+) {
   let localHandler: LocalHandler | null = null
   let activeHandler:
     | ((event: { payload: { pluginId: string; active: boolean; path?: string; instanceId?: string } }) => void)
     | null = null
   const publishLocal = vi.fn(async (topic: string, payload: unknown) => ({ topic, seq: 1 }))
   const view = {
-    activeEditor: {
-      pluginId: 'com.tenon.editor',
-      path: '/levels/level01.scene.json',
-      instanceId: 'editor-1',
-    },
+    activeEditor,
+    initialization: { plugin: { id: 'com.tenon.editor' } },
     capabilities: { localEvents: true, editorContext: true },
     publishLocal,
     subscribeLocal: vi.fn(async (topic: string) => ({ topic, seq: 1 })),
@@ -111,11 +114,11 @@ function fakeViewClient() {
   return {
     view,
     publishLocal,
-    emitLocal: (payload: ScenePanelMessage) =>
+    emitLocal: (payload: ScenePanelMessage, from = 'editor-1') =>
       localHandler?.({
         topic: SCENE_PANEL_TOPIC,
         seq: 1,
-        from: 'editor-1',
+        from,
         payload,
       }),
     emitActive: (payload: {
@@ -166,6 +169,16 @@ describe('scene panel bridge', () => {
     emitLocal({ kind: 'snapshot-request', target: 'editor-1', requestId: 'r1' })
     expect(
       publishLocal.mock.calls.some((call) => (call[1] as ScenePanelMessage).kind === 'snapshot'),
+    ).toBe(true)
+
+    publishLocal.mockClear()
+    emitLocal({ kind: 'discover', requestId: 'd1' })
+    expect(
+      publishLocal.mock.calls.some(
+        (call) =>
+          (call[1] as ScenePanelMessage).kind === 'editor-online' &&
+          (call[1] as { active?: boolean }).active === true,
+      ),
     ).toBe(true)
 
     publishLocal.mockClear()
@@ -254,5 +267,53 @@ describe('scene panel bridge', () => {
       .map((call) => call[1] as ScenePanelMessage)
       .find((message) => message.kind === 'command')
     expect(command).toMatchObject({ kind: 'command', target: 'editor-2' })
+  })
+
+  it('discovers the active scene editor when the panel starts before it', async () => {
+    const { view, publishLocal, emitLocal } = fakeViewClient(null)
+    render(<PanelHarness view={view} />)
+
+    await waitFor(() =>
+      expect(
+        publishLocal.mock.calls.some(
+          (call) => (call[1] as ScenePanelMessage).kind === 'discover',
+        ),
+      ).toBe(true),
+    )
+
+    emitLocal(
+      {
+        kind: 'editor-online',
+        path: '/levels/level01.scene.json',
+        instanceId: 'editor-9',
+        active: true,
+      },
+      'editor-9',
+    )
+    await waitFor(() =>
+      expect(
+        publishLocal.mock.calls.some(
+          (call) =>
+            (call[1] as ScenePanelMessage).kind === 'snapshot-request' &&
+            (call[1] as { target?: string }).target === 'editor-9',
+        ),
+      ).toBe(true),
+    )
+
+    emitLocal(
+      {
+        kind: 'snapshot',
+        snapshot: {
+          revision: 1,
+          path: '/levels/level01.scene.json',
+          doc: levelScene(),
+          selection: null,
+          canWrite: true,
+          levelMode: true,
+        },
+      },
+      'editor-9',
+    )
+    expect(await screen.findByText('scene_level')).toBeTruthy()
   })
 })

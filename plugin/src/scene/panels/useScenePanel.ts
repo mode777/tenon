@@ -109,6 +109,28 @@ export function useScenePanel(
     const offLocal = view.onLocalEvent(SCENE_PANEL_TOPIC, (event) => {
       if (!isScenePanelMessage(event.payload)) return
       const message = event.payload
+      if (message.kind === 'editor-online') {
+        activeEventSeenRef.current = true
+        if (!message.active) {
+          if (activeRef.current?.instanceId === message.instanceId) activate(null)
+          return
+        }
+        if (!isSceneEditorPath(message.path)) return
+        const current = activeRef.current
+        if (current && current.instanceId !== message.instanceId) return
+        if (!current) {
+          activate({
+            pluginId: view.initialization.plugin.id,
+            path: message.path,
+            instanceId: message.instanceId,
+          })
+        } else if (normalizeScenePath(current.path) !== normalizeScenePath(message.path)) {
+          activate({ ...current, path: message.path })
+        } else if (!snapshotRef.current) {
+          requestSnapshot(current)
+        }
+        return
+      }
       const editor = activeRef.current
       if (!editor || event.from !== editor.instanceId) return
       if (message.kind === 'snapshot') {
@@ -162,9 +184,16 @@ export function useScenePanel(
           // The initial active-editor context still works without live updates.
         }
         await view.subscribeLocal(SCENE_PANEL_TOPIC)
-        if (!cancelled) {
-          activate(activeEventSeenRef.current ? activeRef.current : view.activeEditor)
-        }
+        if (cancelled) return
+        activate(activeEventSeenRef.current ? activeRef.current : view.activeEditor)
+        void view
+          .publishLocal(SCENE_PANEL_TOPIC, {
+            kind: 'discover',
+            requestId: `discover-${++requestIdRef.current}`,
+          })
+          .catch((cause: unknown) => {
+            setError(`Could not discover the scene editor: ${errorMessage(cause)}`)
+          })
       } catch (cause) {
         if (!cancelled) setError(errorMessage(cause))
       }
@@ -179,7 +208,7 @@ export function useScenePanel(
       view.unsubscribe(SCENE_PANEL_TOPIC)
       view.unsubscribe('editor/active')
     }
-  }, [activate, clearTimer, view])
+  }, [activate, clearTimer, requestSnapshot, view])
 
   const sendCommand = useCallback(
     (command: SceneCommand) => {

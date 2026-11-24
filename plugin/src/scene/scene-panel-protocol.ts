@@ -22,6 +22,8 @@ export type ScenePanelMessage =
   | { kind: 'command'; target: string; requestId: string; command: SceneCommand }
   | { kind: 'command-result'; requestId: string; ok: boolean; message?: string }
   | { kind: 'focus-tab'; path: string; tab: InspectionTab }
+  | { kind: 'discover'; requestId: string }
+  | { kind: 'editor-online'; path: string; instanceId: string; active: boolean }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -52,6 +54,14 @@ export function isScenePanelMessage(value: unknown): value is ScenePanelMessage 
       return (
         typeof value.path === 'string' &&
         (value.tab === 'validation' || value.tab === 'public' || value.tab === 'debug')
+      )
+    case 'discover':
+      return typeof value.requestId === 'string'
+    case 'editor-online':
+      return (
+        typeof value.path === 'string' &&
+        typeof value.instanceId === 'string' &&
+        typeof value.active === 'boolean'
       )
     default:
       return false
