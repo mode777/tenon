@@ -3,24 +3,26 @@
 ## What this repo is
 
 Tenon is a browser-based, schema-driven 3D entity and scene editor. The repo contains
-the implemented M1 Tenon Exo plugin (`plugin/`), its vendored SDK (`sdk/`), a demo
-workspace (`examples/m1-workspace/`), and the design docs. Scene, event, generator, and
-lightmap milestones remain design-only.
+the implemented M1 and M2 Tenon Exo plugin (`plugin/`), its vendored SDK (`sdk/`), demo
+workspaces (`examples/m1-workspace/`, `examples/m2-workspace/`), and the design docs.
+Event, generator, lightmap, and runtime-build milestones remain design-only.
 
-The M1 plugin, manifest, schema editor, and example workspace exist. Future roadmap
-formats (`scenes/`, `build/`, generator scripts, scene/level/generator editors) are
-still planned; do not create them just to "verify" a doc.
+The plugin, manifest, project hub, schema editor, project editor, scene/level editor,
+and example workspaces exist. Future roadmap formats (`generators/`, `build/`, generator
+scripts, generator editor) are still planned; do not create them just to "verify" a doc.
 
 ## Where things live
 
 - `README.md` — pitch, live URLs, development commands, document index, status.
-- `plugin/` — implemented Tenon Exo plugin: manifest, controller, project hub, schema editor.
+- `plugin/` — implemented Tenon Exo plugin: manifest, controller, project hub, schema editor, project editor, scene/level editor.
 - `sdk/` — vendored `@exo/plugin-sdk`; keep unmodified against upstream.
-- `examples/m1-workspace/` — live M1 demo workspace with a sample schema.
+- `examples/m1-workspace/` — live M1 demo workspace with sample schemas.
+- `examples/m2-workspace/` — live M2 demo workspace with schemas, a train scene, a level, and a GLB asset.
 - `.github/workflows/deploy.yml` — GitHub Pages deployment for the plugin.
 - `docs/editor-concept.md` — conceptual model and authoring workflow.
 - `docs/schema-editor-ui.md` — schema editor layout, interactions, and M1 scope.
-- `docs/technical-decisions.md` — formats and pipeline, decisions `TD-01`…`TD-28`.
+- `docs/scene-editor-ui.md` — project editor, scene/level editor, composition, promotions, slots, and M2 scope.
+- `docs/technical-decisions.md` — formats and pipeline, decisions `TD-01`…`TD-30`.
 - `docs/roadmap.md` — milestones `M0`–`M6`, each with a demo and acceptance criteria.
 - `docs/basic3d.schema.json` — reference for the builtin `basic3d` schema.
 - `.agents/skills/create-exo-plugin/SKILL.md` — vendored Exo plugin authoring skill.
@@ -45,9 +47,18 @@ still planned; do not create them just to "verify" a doc.
 - Use the Exo plugin SDK for every handshake, envelope, file read, save, command, and
   theme change. Never hand-write `postMessage` frames.
 - Before shipping: `npm test`, `npm run typecheck`, and `npm run build`.
-- The schema editor must not read or write `exo.json` or `.exo/**`, and must not write
+- The format editors must not read or write `exo.json` or `.exo/**`, and must not write
   another workspace file. Saves go through `onSaveRequest`; new files go through the
-  New Schema command and shell-owned `requestNewFile` dialog.
+  New Schema/New Scene commands and shell-owned `requestNewFile` dialog.
+
+## Git workflow
+
+- Always commit and push completed work without waiting for a separate request.
+- Use a concise imperative commit message and push to the current branch (`main` unless
+  the task says otherwise).
+- After pushing, verify the GitHub Actions run and the deployed result when the change
+  affects the hosted plugin. Report the commit, push, and deployment status.
+- Never commit secrets, credentials, or generated build output.
 
 ## Model invariants (do not contradict)
 
@@ -102,12 +113,13 @@ still planned; do not create them just to "verify" a doc.
 - Format editors are per format, never per definition. Adding a definition changes
   schema data and adds no page, glob, or editor code.
 - The project hub panel (`tenon.project`) is the only shell panel. It is
-  project-level, hosts the New Schema action, and is the target of the
-  `tenon.new-schema` command. Per-document tools stay in editor frames.
-- New Schema requires Exo 0.8.0+ command-scoped user activation; the panel may call
-  `requestNewFile` during its live command invocation without owning DOM focus.
-- The schema editor is M1. It is a DOM-only frame; the scene editor adds three.js in
-  M2.
+  project-level, hosts the New Schema and New Scene actions, and is the target of the
+  `tenon.new-schema` and `tenon.new-scene` commands. Per-document tools stay in editor
+  frames.
+- New Schema and New Scene require Exo 0.8.0+ command-scoped user activation; the panel
+  may call `requestNewFile` during its live command invocation without owning DOM focus.
+- The schema and project editors are DOM-only frames. The scene editor is M2 and adds
+  the three.js viewport; the generator editor is still later.
 - Each open document is its own frame with its own buffer, selection, undo/redo, and
   validation. Frames do not share mutable state.
 - The plugin writes only the open document through the shell save handler; new files

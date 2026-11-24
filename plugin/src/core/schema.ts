@@ -70,6 +70,13 @@ export interface ValidationIssue {
   eventName?: string
   enumName?: string
   enumValue?: string
+  /** Scene-document context. */
+  entityId?: string
+  promotionName?: string
+  slotName?: string
+  scenePath?: string
+  /** Authoring file that produced the issue, when it is not the open document. */
+  sourcePath?: string
 }
 
 export interface EffectiveField {

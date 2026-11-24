@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "gameA": "schemas/gameA.schema.json",
+    "shared": "schemas/shared.schema.json"
+  }
+}

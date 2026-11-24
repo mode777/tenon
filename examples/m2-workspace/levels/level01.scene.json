@@ -1,0 +1,48 @@
+{
+  "id": "scene_level01",
+  "requires": ["basic3d@1.0.0", "gameA@1.0.0"],
+  "root": "root",
+  "entities": [
+    {
+      "id": "root",
+      "type": "basic3d:node"
+    },
+    {
+      "id": "train_1",
+      "name": "Train",
+      "scene": "scenes/train.scene.json",
+      "parent": "root",
+      "transform": {
+        "position": [0, 0, 0],
+        "rotation": [0, 25, 0]
+      },
+      "props": {
+        "power": 2,
+        "tone": "cool",
+        "target": "button_1"
+      }
+    },
+    {
+      "id": "button_1",
+      "name": "Start button",
+      "type": "gameA:button",
+      "parent": "train_1",
+      "slot": "button_0",
+      "props": {
+        "label": "Start",
+        "style": "primary"
+      }
+    },
+    {
+      "id": "sun",
+      "name": "Sun",
+      "type": "basic3d:directionalLight",
+      "parent": "root",
+      "transform": {
+        "rotation": [45, -30, 0]
+      }
+    }
+  ],
+  "promotes": {},
+  "slots": {}
+}

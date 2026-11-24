@@ -289,6 +289,60 @@ button {
   font-size: 10px;
 }
 
+.hub-section {
+  margin-top: 18px;
+}
+
+.hub-section:first-of-type {
+  margin-top: 4px;
+}
+
+.section-heading.compact {
+  margin-bottom: 8px;
+}
+
+.section-heading.compact h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.section-heading.compact p {
+  margin: 2px 0 0;
+  color: var(--exo-muted-fg);
+  font-size: 10px;
+}
+
+.empty-state.compact {
+  min-height: 84px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.empty-state.compact h3 {
+  font-size: 11px;
+}
+
+.empty-state.compact p {
+  max-width: none;
+  margin: 0;
+  font-size: 10px;
+}
+
+.empty-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.schema-icon.scene-icon {
+  color: var(--exo-warning);
+}
+
+.schema-icon.level-icon {
+  color: var(--exo-success);
+}
+
 .project-footer {
   display: flex;
   justify-content: space-between;

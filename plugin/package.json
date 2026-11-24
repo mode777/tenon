@@ -1,9 +1,9 @@
 {
   "name": "@tenon/plugin",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Tenon schema editor for the Exo shell",
+  "description": "Tenon schema, project, and scene editors for the Exo shell",
   "scripts": {
     "dev": "vite --port 5175 --strictPort",
     "build": "tsc --noEmit && vite build",
@@ -12,8 +12,11 @@
   },
   "dependencies": {
     "@exo/plugin-sdk": "1.8.0",
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.2",
@@ -22,6 +25,7 @@
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.187.0",
     "@vitejs/plugin-react": "^6.3.0",
     "jsdom": "^31.0.1",
     "typescript": "~5.9.3",

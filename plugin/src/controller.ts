@@ -14,12 +14,28 @@ async function main(): Promise<void> {
   }
 
   connection.registration.register({
+    glob: 'project.json',
+    entry: 'editors/project.html',
+    label: 'Tenon Project',
+  })
+  connection.registration.register({
     glob: 'schemas/*.schema.json',
-    entry: 'editor.html',
+    entry: 'editors/schema.html',
     label: 'Tenon Schema',
+  })
+  connection.registration.register({
+    glob: 'scenes/*.scene.json',
+    entry: 'editors/scene.html',
+    label: 'Tenon Scene',
+  })
+  connection.registration.register({
+    glob: 'levels/*.scene.json',
+    entry: 'editors/scene.html',
+    label: 'Tenon Level',
   })
   connection.registration.registerPanel('tenon.project')
   connection.registration.registerCommand('tenon.new-schema')
+  connection.registration.registerCommand('tenon.new-scene')
 
   const ack = await connection.registration.complete()
   show(`Tenon registered: ${ack.accepted.join(', ') || 'no editors'}`)

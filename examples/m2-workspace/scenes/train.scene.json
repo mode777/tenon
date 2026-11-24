@@ -1,0 +1,92 @@
+{
+  "id": "scene_train",
+  "requires": ["basic3d@1.0.0", "gameA@1.0.0"],
+  "root": "root",
+  "entities": [
+    {
+      "id": "root",
+      "type": "gameA:train",
+      "props": {
+        "speed": 0
+      }
+    },
+    {
+      "id": "body",
+      "name": "Body",
+      "type": "basic3d:mesh",
+      "parent": "root",
+      "transform": {
+        "position": [0, 0.55, 0],
+        "scale": [2.6, 0.7, 1.1]
+      },
+      "props": {
+        "mesh": "assets/cube.glb"
+      }
+    },
+    {
+      "id": "wheel_front",
+      "name": "Front wheel",
+      "type": "basic3d:mesh",
+      "parent": "root",
+      "transform": {
+        "position": [-0.85, 0.28, 0],
+        "rotation": [0, 0, 90],
+        "scale": [0.55, 0.18, 0.55]
+      },
+      "props": {
+        "mesh": "assets/cube.glb"
+      }
+    },
+    {
+      "id": "wheel_back",
+      "name": "Rear wheel",
+      "type": "basic3d:mesh",
+      "parent": "root",
+      "transform": {
+        "position": [0.85, 0.28, 0],
+        "rotation": [0, 0, 90],
+        "scale": [0.55, 0.18, 0.55]
+      },
+      "props": {
+        "mesh": "assets/cube.glb"
+      }
+    },
+    {
+      "id": "engine",
+      "name": "Engine",
+      "type": "gameA:engine",
+      "parent": "root",
+      "transform": {
+        "position": [0, 0.3, 0]
+      },
+      "props": {
+        "power": 1,
+        "target": null
+      }
+    },
+    {
+      "id": "button_anchor",
+      "name": "Button mount",
+      "type": "basic3d:node",
+      "parent": "root",
+      "transform": {
+        "position": [0, 1.15, 0.6]
+      }
+    }
+  ],
+  "promotes": {
+    "power": {
+      "entity": "engine",
+      "field": "power"
+    },
+    "target": {
+      "entity": "engine",
+      "field": "target"
+    }
+  },
+  "slots": {
+    "button_0": {
+      "entity": "button_anchor"
+    }
+  }
+}

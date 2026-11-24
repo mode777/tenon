@@ -14,7 +14,13 @@ export default defineConfig(({ command }) => ({
   build: {
     target: 'es2022',
     rollupOptions: {
-      input: ['plugin.html', 'editor.html', 'views/project.html'],
+      input: [
+        'plugin.html',
+        'editors/project.html',
+        'editors/schema.html',
+        'editors/scene.html',
+        'views/project.html',
+      ],
     },
   },
   test: {

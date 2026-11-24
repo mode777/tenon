@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "com.tenon.editor",
   "name": "Tenon",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Schema-first entity and scene authoring for Tenon projects.",
   "publisher": {
     "name": "Tenon"
@@ -22,9 +22,30 @@
   "contributes": {
     "fileEditors": [
       {
+        "glob": "project.json",
+        "entry": "editors/project.html",
+        "label": "Tenon Project",
+        "priority": 30,
+        "rendering": "frame"
+      },
+      {
         "glob": "schemas/*.schema.json",
-        "entry": "editor.html",
+        "entry": "editors/schema.html",
         "label": "Tenon Schema",
+        "priority": 30,
+        "rendering": "frame"
+      },
+      {
+        "glob": "scenes/*.scene.json",
+        "entry": "editors/scene.html",
+        "label": "Tenon Scene",
+        "priority": 30,
+        "rendering": "frame"
+      },
+      {
+        "glob": "levels/*.scene.json",
+        "entry": "editors/scene.html",
+        "label": "Tenon Level",
         "priority": 30,
         "rendering": "frame"
       }
@@ -42,6 +63,18 @@
       {
         "id": "tenon.new-schema",
         "title": "New Schema",
+        "category": "Tenon",
+        "target": {
+          "kind": "panel",
+          "id": "tenon.project"
+        },
+        "menus": [
+          "commandPalette"
+        ]
+      },
+      {
+        "id": "tenon.new-scene",
+        "title": "New Scene",
         "category": "Tenon",
         "target": {
           "kind": "panel",

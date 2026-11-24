@@ -475,8 +475,8 @@ the 3D stack; the generator editor may reuse it for preview:
 - TypeScript and React for every frame.
 - three.js for immediate representation in the scene editor and generator preview.
 - `@react-three/fiber` and `@react-three/drei` for the viewport.
-- `three-mesh-bvh` for picking on complex meshes.
-- `zustand` for per-document editor state.
+- `three-mesh-bvh` when picking on complex meshes needs acceleration; the M2 baseline does not require it.
+- Per-document editor state and a command-oriented history hook. `zustand` can be introduced when cross-component viewport state warrants a shared store; M2 keeps document state in the frame.
 - Command pattern for per-document undo/redo.
 - Schema-generated inspector.
 - 3D viewport first; orthographic 2D views later.
@@ -709,8 +709,9 @@ The plugin also contributes one project-level panel and one command:
 
 | Contribution | Id | Purpose |
 |---|---|---|
-| Panel | `tenon.project` | Project hub: schema list and creation actions |
+| Panel | `tenon.project` | Project hub: schema/scene list and creation actions |
 | Command | `tenon.new-schema` | **New Schema** in the command palette; targets the project hub |
+| Command | `tenon.new-scene` | **New Scene** in the command palette; targets the project hub |
 
 - Every file editor uses `rendering: "frame"`. The default hidden rendering is for
   the controller and headless transforms, not for these visual editors.
@@ -718,9 +719,9 @@ The plugin also contributes one project-level panel and one command:
   default; the shell's Open With still allows another editor.
 - A level is a scene document used as the top-level world, so it reuses the scene
   editor and adds level-only controls. There is no separate level format.
-- The controller page registers the declared file editors, the project panel, and
-  the `tenon.new-schema` command, then is removed. Each open document gets its own
-  handler frame with its own buffer, selection, undo/redo stack, and validation
+- The controller page registers the declared file editors, the project panel, and the
+  `tenon.new-schema`/`tenon.new-scene` commands, then is removed. Each open document gets
+  its own handler frame with its own buffer, selection, undo/redo stack, and validation
   state. Frames do not share mutable state.
 - Format editors are per format, never per definition. Adding a concrete
   definition changes schema data only; it adds no page, glob, or editor code.
@@ -756,10 +757,11 @@ The plugin also contributes one project-level panel and one command:
   permissions, and editor globs; adding a glob re-prompts.
 - New authoring documents are created only through shell-owned dialogs; the plugin
   never writes them directly.
-- New Schema is a command targeting the project hub. The shell reveals the panel,
-  delivers the command, and treats the live invocation as user activation, so the
-  panel may call `requestNewFile` even without owning DOM focus. The panel then
-  calls `openFile`. The panel's New Schema button uses the same request path.
+- New files are created by panel/command actions, never background writes. The shell
+  reveals the panel, delivers the command, and treats the live invocation as user
+  activation, so the panel may call `requestNewFile` even without owning DOM focus. The
+  panel then calls `openFile`. The panel's New Schema and New Scene buttons use the same
+  request path.
 - This requires Exo 0.8.0 or newer for command-scoped user activation. The manifest
   declares that minimum range; the command still obeys permission, write, size,
   rate, and shell-dialog checks.
@@ -792,11 +794,11 @@ in [schema-editor-ui.md](schema-editor-ui.md).
 
 - The schema editor is a DOM-only frame; it does not load three.js or scene code
   (TD-15).
-- The plugin contributes the `tenon.project` panel and `tenon.new-schema` command
-  (TD-26).
+- The plugin contributes the `tenon.project` panel and the
+  `tenon.new-schema`/`tenon.new-scene` commands (TD-26).
 - M1 uses one open schema bundle plus builtin `basic3d` and its declared schema
-  imports as the unit of work. The project editor, import-map editing, and remote
-  bundle UI arrive with the scene editor (M2).
+  imports as the unit of work. The M2 project editor provides import-map editing and
+  project-wide resolution, and the scene editor reads the same resolved packages.
 - The bundle header edits `id`, `namespace`, and `version`. Changing the namespace
   rewrites this bundle's definition IDs and local qualified references; it never
   rewrites another file (TD-29).
@@ -907,6 +909,23 @@ comes from the project import map (TD-03, TD-25).
   is rewritten; dependent documents surface validation errors.
 - Renaming a namespace or package version is a breaking change for consumers.
   Authors update `imports` and qualified references deliberately in each document.
-- The project import map editor remains part of the project editor (M2). Until then,
-  a workspace can map imports in `project.json` by hand; the schema editor still
-  resolves adjacent `schemas/*.schema.json` packages for local authoring.
+- The project import map editor is part of the project editor (M2). A workspace can
+  also map imports in `project.json` by hand; the schema editor still resolves adjacent
+  `schemas/*.schema.json` packages for local authoring.
+
+## TD-30 — Scene editor transforms and debug expansion
+
+The M2 scene editor projects the scene document into three.js. The document remains the
+source of truth; the renderer never owns authoring data.
+
+- Entity rotations are Euler XYZ angles in **degrees** in authoring JSON. The viewport
+  converts to radians only for rendering.
+- The viewport edits the selected entity's local transform. A scene instance transform
+  places the referenced scene; internal transforms stay private.
+- Scene instance internals are rendered read-only. Host entities attach only through
+  declared slots, and the host's hierarchy shows the attachment under the instance.
+- The debug expansion resolves scene instances, promotions, and slot attachments into a
+  flat, runtime-shaped entity list for inspection. It is computed in memory, is never
+  saved, and is not the runtime build.
+- The project editor's content hashes are display/integrity hints. The build pipeline
+  remains authoritative for cooking and output.

@@ -349,8 +349,8 @@ speed; the inspector is for completeness.
   - `enum`: select a local or imported enum; imported enums are qualified;
   - `color`: swatch plus hex/rgba input;
   - `vec2`/`vec3`: compact numeric inputs;
-  - `entityRef`: no default; entity pickers arrive with the scene editor;
-  - `assetRef`: no default or a workspace path; the asset picker arrives with M2.
+  - `entityRef`: no default; entity pickers are available in the M2 scene editor;
+  - `assetRef`: no default or a workspace path; the M2 scene editor provides the asset picker.
 - Later types (`array<T>`, `flags`, `nullable`) show a read-only type pill and a raw
   JSON default editor in M1.
 - Documentation.

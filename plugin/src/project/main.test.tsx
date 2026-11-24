@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ViewClient } from '@exo/plugin-sdk'
+import { ExoProtocolError } from '@exo/plugin-sdk'
 import { ProjectHub } from './main'
 
 function mockClient(overrides: Record<string, unknown> = {}) {
@@ -54,7 +55,7 @@ describe('ProjectHub', () => {
     const user = userEvent.setup()
     const { client } = mockClient()
     render(<ProjectHub client={client} />)
-    await user.click(screen.getByRole('button', { name: 'New Schema' }))
+    await user.click(await screen.findByRole('button', { name: 'New Schema' }))
     await waitFor(() => expect(client.requestNewFile).toHaveBeenCalledTimes(1))
     expect(client.requestNewFile).toHaveBeenCalledWith(expect.objectContaining({
       suggestedName: 'new.schema.json',
@@ -62,6 +63,21 @@ describe('ProjectHub', () => {
       text: expect.stringContaining('"definitions"'),
     }))
     await waitFor(() => expect(client.openFile).toHaveBeenCalledWith('/schemas/new.schema.json'))
+  })
+
+  it('creates a scene and opens it', async () => {
+    const user = userEvent.setup()
+    const { client } = mockClient({
+      requestNewFile: vi.fn(async () => ({ path: '/scenes/new.scene.json', version: 'v1' })),
+    })
+    render(<ProjectHub client={client} />)
+    await user.click(await screen.findByRole('button', { name: 'New Scene' }))
+    await waitFor(() => expect(client.requestNewFile).toHaveBeenCalledWith(expect.objectContaining({
+      suggestedName: 'new.scene.json',
+      directory: '/scenes',
+      text: expect.stringContaining('"requires"'),
+    })))
+    await waitFor(() => expect(client.openFile).toHaveBeenCalledWith('/scenes/new.scene.json'))
   })
 
   it('handles the New Schema command without focus', async () => {
@@ -74,12 +90,28 @@ describe('ProjectHub', () => {
     await waitFor(() => expect(client.openFile).toHaveBeenCalledWith('/schemas/new.schema.json'))
   })
 
-  it('shows an empty state when there are no schemas', async () => {
+  it('keeps schemas visible when the scenes directory is absent', async () => {
+    const { client } = mockClient({
+      listDirectory: vi.fn(async (path: string) => {
+        if (path === '/scenes' || path === '/levels') {
+          throw new ExoProtocolError('not-found', `Missing ${path}`)
+        }
+        return {
+          entries: [{ path: '/schemas/gameA.schema.json', kind: 'file', size: 100 }],
+        }
+      }),
+    })
+    render(<ProjectHub client={client} />)
+    expect(await screen.findByText('gameA.schema.json')).toBeTruthy()
+    expect(await screen.findByText('No scenes yet')).toBeTruthy()
+  })
+
+  it('shows an empty state when there are no documents', async () => {
     const { client } = mockClient({
       listDirectory: vi.fn(async () => ({ entries: [] })),
     })
     render(<ProjectHub client={client} />)
-    expect(await screen.findByText('No schema bundles yet')).toBeTruthy()
+    expect(await screen.findByText('No schemas or scenes yet')).toBeTruthy()
   })
 
   it('disables New Schema in a read-only workspace', async () => {
@@ -89,6 +121,6 @@ describe('ProjectHub', () => {
     })
     render(<ProjectHub client={client} />)
     expect(await screen.findByText(/read-only/i)).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'New Schema' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(((await screen.findByRole('button', { name: 'New Schema' })) as HTMLButtonElement).disabled).toBe(true)
   })
 })

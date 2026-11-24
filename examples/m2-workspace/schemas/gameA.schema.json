@@ -1,0 +1,46 @@
+{
+  "id": "com.example.gameA",
+  "version": "1.0.0",
+  "namespace": "gameA",
+  "imports": {
+    "shared": "1.0.0"
+  },
+  "enums": {
+    "ButtonStyle": {
+      "values": ["primary", "secondary", "danger"]
+    }
+  },
+  "definitions": {
+    "gameA:renderable": {
+      "abstract": true,
+      "fields": {
+        "visible": { "type": "bool", "default": true },
+        "castShadows": { "type": "bool", "default": true }
+      }
+    },
+    "gameA:train": {
+      "compose": ["shared:tintable"],
+      "fields": {
+        "speed": { "type": "float", "default": 0 }
+      },
+      "doc": "Root definition for the reusable train scene."
+    },
+    "gameA:engine": {
+      "fields": {
+        "power": { "type": "float", "default": 1 },
+        "target": { "type": "entityRef", "scope": "host", "default": null }
+      },
+      "doc": "Drives the train. The scene promotes power and an input entity ref."
+    },
+    "gameA:button": {
+      "compose": ["gameA:renderable"],
+      "fields": {
+        "label": { "type": "string", "default": "Press" },
+        "style": { "type": "enum", "enum": "ButtonStyle", "default": "primary" }
+      },
+      "events": {
+        "pressed": {}
+      }
+    }
+  }
+}

@@ -225,16 +225,16 @@ A level is a scene document used as the top-level world, so it opens in the scen
 editor with level-only controls. There is no separate level format and no level
 field in the document; the `levels/` path selects level mode.
 
-One project-level Tenon panel is the creation hub. It lists schema bundles (and
-later scenes, levels, generators, and assets) and hosts **New Schema**. The panel
-is also the target of the `tenon.new-schema` command, so the same action is
-available from the Exo command palette. A live command invocation lets the panel
-create the file through the shell-owned dialog and open it in the schema editor.
-The hub is not a document editor and has no dirty state.
+One project-level Tenon panel is the creation hub. It lists schema bundles and
+scene/level documents and hosts **New Schema** and **New Scene**. The panel is also
+the target of the `tenon.new-schema` and `tenon.new-scene` commands, so the same
+actions are available from the Exo command palette. A live command invocation lets
+the panel create the file through the shell-owned dialog and open it in its format
+editor. The hub is not a document editor and has no dirty state.
 
 The editors are per format, not per definition. Adding a concrete definition is
-a schema edit; it does not add a page, a glob, or editor code. The schema editor
-is the first editor milestone; the scene editor follows.
+a schema edit; it does not add a page, a glob, or editor code. The schema editor is
+M1; the project and scene/level editors are M2, and the generator editor follows.
 
 ### Scene and level editor
 
