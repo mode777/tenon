@@ -20,6 +20,7 @@ function capabilities(overrides: Partial<EditorCapabilities> = {}): EditorCapabi
     openView: true,
     requestPanel: true,
     commands: true,
+    editorContext: true,
     ...overrides,
   }
 }
@@ -36,6 +37,8 @@ function viewInit(overrides: Partial<ViewInit> = {}): ViewInit {
     permissions: ['workspace:read', 'workspace:list', 'events:subscribe'],
     locale: 'en',
     settings: {},
+    activeContentView: null,
+    activeEditor: null,
     view: {
       kind: 'content',
       id: 'tutorial',
@@ -88,6 +91,50 @@ describe('view client', () => {
     expect('setDirty' in client).toBe(false)
     expect('requestSave' in client).toBe(false)
     expect('onSaveRequest' in client).toBe(false)
+  })
+
+  it('exposes the active editor and accepts a bottom view location', async () => {
+    const { client } = await connect(
+      viewInit({
+        activeEditor: {
+          pluginId: 'com.example.viewer',
+          path: '/notes.txt',
+          instanceId: 'editor-1',
+        },
+        view: {
+          kind: 'panel',
+          id: 'inspection',
+          title: 'Inspection',
+          instanceId: 'panel-2',
+          location: 'bottom',
+        },
+      }),
+    )
+    expect(client.activeEditor).toEqual({
+      pluginId: 'com.example.viewer',
+      path: '/notes.txt',
+      instanceId: 'editor-1',
+    })
+    expect(client.view.location).toBe('bottom')
+    const activeEditor = client.activeEditor
+    if (!activeEditor) throw new Error('missing active editor')
+    expect('readFile' in activeEditor).toBe(false)
+  })
+
+  it('reports a null active editor on an older shell', async () => {
+    const { client } = await connect(viewInit({ activeEditor: null }))
+    expect(client.activeEditor).toBeNull()
+  })
+
+  it('rejects a malformed active editor', async () => {
+    const transport = new FakePluginTransport({ mode: 'view', sessionId: SESSION_ID })
+    const promise = connectPlugin({ transport })
+    transport.emit({
+      exo: 1,
+      type: 'shell/init',
+      payload: viewInit({ activeEditor: { pluginId: 1 } as never }),
+    })
+    await expect(promise).rejects.toMatchObject({ code: 'protocol-violation' })
   })
 
   it('rejects a shell init for another mode', async () => {
@@ -148,6 +195,11 @@ describe('view client', () => {
     await expect(old.client.openFile('/notes.txt')).rejects.toMatchObject({
       code: 'unsupported-message',
     })
+  })
+
+  it('reports a false editorContext bit on an older shell', async () => {
+    const old = await connect(viewInit({ capabilities: capabilities({ editorContext: false }) }))
+    expect(old.client.capabilities.editorContext).toBe(false)
   })
 
   it('opens a view with a payload and enforces the 64 KiB limit', async () => {

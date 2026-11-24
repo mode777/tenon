@@ -34,6 +34,10 @@ async function main(): Promise<void> {
     label: 'Tenon Level',
   })
   connection.registration.registerPanel('tenon.project')
+  connection.registration.registerPanel('tenon.scene.inspector')
+  if (connection.init.capabilities.bottomPanel) {
+    connection.registration.registerPanel('tenon.scene.inspection')
+  }
   connection.registration.registerCommand('tenon.new-schema')
   connection.registration.registerCommand('tenon.new-scene')
 

@@ -133,8 +133,9 @@ The sample loads, resolves defaults, and reports errors for deliberately broken 
 - Minimal project editor: import map for the locations of schema packages, resolved schema versions, and project-wide validation.
 - New Scene action on the project hub.
 - Scene editor frame for `scenes/*.scene.json` and `levels/*.scene.json`.
+- Inspector and Inspection shell panels that follow the active scene/level editor; requires Exo 0.10.0+.
 - 3D viewport with three.js, React Three Fiber, and drei.
-- Scene hierarchy, schema-generated inspector, entity palette (concrete definitions only), and asset browser.
+- Scene hierarchy, schema-generated Inspector and Inspection shell panels (secondary and bottom), entity palette (concrete definitions only), and asset browser.
 - Place, select, move, rotate, scale, duplicate, and delete entities.
 - Save and reload scene documents through the shell; undo/redo per document.
 - Level mode: the same scene editor with level-only controls.
@@ -158,7 +159,7 @@ The sample loads, resolves defaults, and reports errors for deliberately broken 
 **Done when**
 
 - Scene entities can be placed, transformed, edited, duplicated, deleted, saved, and reloaded.
-- The inspector is generated from the schema; the palette shows concrete definitions only.
+- The Inspector panel is generated from the schema; the palette shows concrete definitions only.
 - A glb in `assets/` can be selected and placed as a mesh instance.
 - Every entity has a transform; omitted transforms are identity.
 - A scene can be instanced without exposing its internals.

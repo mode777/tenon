@@ -76,8 +76,9 @@ The plugin contributes one project-level panel, `tenon.project`, titled
 - Hosts the **New Schema** action; disabled in a read-only workspace.
 - Later milestones add scenes, levels, generators, and assets to the same hub.
 
-The project hub is not document-scoped. Per-document hierarchy, inspector,
-palette, and validation stay inside the editor frames.
+The project hub is not document-scoped. The schema editor keeps its own sidebar,
+inspector, and validation drawer inside its frame; the scene editor's Inspector and
+Inspection surfaces are shell panels (see [Project and scene editors](scene-editor-ui.md)).
 
 ### New Schema command
 

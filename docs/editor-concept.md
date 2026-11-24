@@ -135,8 +135,8 @@ Every entity instance has a transform: position, rotation, and scale. It is buil
 placement data, not a schema field or definition, and it is stored outside `props`.
 
 - An omitted transform or omitted component defaults to identity.
-- The viewport edits transforms directly; the schema editor and schema-generated
-  inspector do not.
+- The viewport and the scene Inspector panel edit transforms directly; the schema
+  editor does not.
 - Hierarchy composes transforms from parent to child. A scene instance's transform
   places the referenced scene; the scene root stays relative to the instance.
 - Building does not flatten the transform hierarchy. Scene boundaries and slot names
@@ -218,7 +218,7 @@ The plugin contributes one visible frame editor per authoring format:
 |---|---|---|
 | **Project** | `project.json` | Import map, resolved schema versions, project-wide validation, build readiness |
 | **Schema** | `schemas/*.schema.json` | Definition tree, composition, fields, enums, defaults, events, read-only builtins |
-| **Scene** | `scenes/*.scene.json`, `levels/*.scene.json` | Hierarchy, 3D viewport, inspector, palette, promotions, slots, validation |
+| **Scene** | `scenes/*.scene.json`, `levels/*.scene.json` | Hierarchy, 3D viewport, palette, shell Inspector/Inspection panels, promotions, slots |
 | **Generator** | `generators/*/generator.json` | Parameter form, seed, preview, bake settings |
 
 A level is a scene document used as the top-level world, so it opens in the scene
@@ -232,6 +232,10 @@ actions are available from the Exo command palette. A live command invocation le
 the panel create the file through the shell-owned dialog and open it in its format
 editor. The hub is not a document editor and has no dirty state.
 
+The scene editor also contributes two document-scoped shell panels: a secondary
+Inspector and a bottom Inspection panel. They follow the active scene/level editor and
+exchange snapshots and commands with it; the editor remains the only document owner.
+
 The editors are per format, not per definition. Adding a concrete definition is
 a schema edit; it does not add a page, a glob, or editor code. The schema editor is
 M1; the project and scene/level editors are M2, and the generator editor follows.
@@ -240,12 +244,12 @@ M1; the project and scene/level editors are M2, and the generator editor follows
 
 - 3D viewport with selection, transform gizmos, grid, and snapping.
 - Scene hierarchy panel.
-- Schema-generated property inspector.
+- Schema-generated property Inspector shell panel.
 - Entity palette showing concrete definitions only.
 - Asset browser for meshes in `assets/`.
 - Scene instance inspector for root and promoted overrides.
-- Promotion and slot editors for the open scene.
-- Validation drawer for the open document.
+- Promotion and slot editors in the Inspection panel's Public surface tab.
+- Validation and debug expansion in the Inspection bottom panel.
 - 2D orthographic views are a later addition.
 
 A scene instance is atomic in the editor: its internals are read-only from the

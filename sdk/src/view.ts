@@ -2,6 +2,8 @@ import type { MessageGate } from './gate'
 import { FrameClient } from './client'
 import {
   ExoProtocolError,
+  type ActiveContentView,
+  type ActiveEditor,
   type EditorLimits,
   type ViewCapabilities,
   type ViewInit,
@@ -30,6 +32,14 @@ export class ViewClient extends FrameClient {
 
   get view(): ViewInitData {
     return { ...this.viewInit.view }
+  }
+
+  get activeContentView(): ActiveContentView | null {
+    return this.viewInit.activeContentView ? { ...this.viewInit.activeContentView } : null
+  }
+
+  get activeEditor(): ActiveEditor | null {
+    return this.viewInit.activeEditor ? { ...this.viewInit.activeEditor } : null
   }
 
   get capabilities(): ViewCapabilities {

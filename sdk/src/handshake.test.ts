@@ -30,7 +30,7 @@ function registerInit(overrides: Partial<RegistrationInit> = {}): RegistrationIn
   return {
     ...base('register'),
     mode: 'register',
-    capabilities: { localEvents: true, newFiles: true },
+    capabilities: { localEvents: true, newFiles: true, bottomPanel: true },
     ...overrides,
   }
 }
@@ -47,6 +47,7 @@ function editorInit(overrides: Partial<EditorInit> = {}): EditorInit {
       mtime: 1000,
       version: 'v1',
     },
+    editor: null,
     capabilities: {
       read: true,
       write: true,
@@ -59,6 +60,7 @@ function editorInit(overrides: Partial<EditorInit> = {}): EditorInit {
       openView: true,
       requestPanel: true,
       commands: true,
+      editorContext: true,
     },
     limits: { maxFileSize: 10 * 1024 * 1024, maxRequestBytes: 16 * 1024 * 1024 },
     ...overrides,
@@ -203,6 +205,40 @@ describe('handshake', () => {
     const oldRegisterConnection = await oldRegisterPromise
     if (oldRegisterConnection.mode !== 'register') throw new Error('expected register mode')
     expect(oldRegisterConnection.init.capabilities.localEvents).toBe(false)
+  })
+
+  it('parses editorContext and bottomPanel and defaults absence to false', async () => {
+    const editor = transport('editor')
+    const editorPromise = connectPlugin({ transport: editor })
+    editor.emit({ exo: 1, type: 'shell/init', payload: editorInit() })
+    const connectedEditor = await editorPromise
+    if (connectedEditor.mode !== 'editor') throw new Error('expected editor mode')
+    expect(connectedEditor.editor.capabilities.editorContext).toBe(true)
+
+    const oldEditor = transport('editor')
+    const oldEditorPromise = connectPlugin({ transport: oldEditor })
+    const editorPayload = editorInit()
+    delete (editorPayload.capabilities as Partial<EditorInit['capabilities']>).editorContext
+    oldEditor.emit({ exo: 1, type: 'shell/init', payload: editorPayload })
+    const oldEditorConnection = await oldEditorPromise
+    if (oldEditorConnection.mode !== 'editor') throw new Error('expected editor mode')
+    expect(oldEditorConnection.editor.capabilities.editorContext).toBe(false)
+
+    const register = transport()
+    const registerPromise = connectPlugin({ transport: register })
+    register.emit({ exo: 1, type: 'shell/init', payload: registerInit() })
+    const connectedRegister = await registerPromise
+    if (connectedRegister.mode !== 'register') throw new Error('expected register mode')
+    expect(connectedRegister.init.capabilities.bottomPanel).toBe(true)
+
+    const oldRegister = transport()
+    const oldRegisterPromise = connectPlugin({ transport: oldRegister })
+    const registerPayload = registerInit()
+    delete (registerPayload.capabilities as Partial<RegistrationInit['capabilities']>).bottomPanel
+    oldRegister.emit({ exo: 1, type: 'shell/init', payload: registerPayload })
+    const oldRegisterConnection = await oldRegisterPromise
+    if (oldRegisterConnection.mode !== 'register') throw new Error('expected register mode')
+    expect(oldRegisterConnection.init.capabilities.bottomPanel).toBe(false)
   })
 
   it('rejects a non-boolean localEvents support bit', async () => {

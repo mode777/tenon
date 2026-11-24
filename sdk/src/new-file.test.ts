@@ -26,6 +26,7 @@ function init(overrides: Partial<EditorInit> = {}): EditorInit {
       mtime: 1000,
       version: 'v1',
     },
+    editor: null,
     capabilities: {
       read: true,
       write: true,
@@ -38,6 +39,7 @@ function init(overrides: Partial<EditorInit> = {}): EditorInit {
       openView: true,
       requestPanel: true,
       commands: true,
+      editorContext: true,
     },
     limits: { maxFileSize: 10 * 1024 * 1024, maxRequestBytes: 16 * 1024 * 1024 },
     ...overrides,

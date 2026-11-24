@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "id": "com.tenon.editor",
   "name": "Tenon",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Schema-first entity and scene authoring for Tenon projects.",
   "publisher": {
     "name": "Tenon"
   },
   "engines": {
-    "exo": ">=0.8.0"
+    "exo": ">=0.10.0"
   },
   "runtime": {
     "entry": "plugin.html"
@@ -57,6 +57,20 @@
         "icon": "symbol-structure",
         "location": "primary",
         "entry": "views/project.html"
+      },
+      {
+        "id": "tenon.scene.inspector",
+        "title": "Inspector",
+        "icon": "symbol-field",
+        "location": "secondary",
+        "entry": "views/inspector.html"
+      },
+      {
+        "id": "tenon.scene.inspection",
+        "title": "Inspection",
+        "icon": "output",
+        "location": "bottom",
+        "entry": "views/inspection.html"
       }
     ],
     "commands": [

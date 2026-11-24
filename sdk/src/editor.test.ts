@@ -26,6 +26,7 @@ function init(overrides: Partial<EditorInit> = {}): EditorInit {
       mtime: 1000,
       version: 'v1',
     },
+    editor: null,
     capabilities: {
       read: true,
       write: true,
@@ -38,6 +39,7 @@ function init(overrides: Partial<EditorInit> = {}): EditorInit {
       openView: true,
       requestPanel: true,
       commands: true,
+      editorContext: true,
     },
     limits: { maxFileSize: 10 * 1024 * 1024, maxRequestBytes: 16 * 1024 * 1024 },
     ...overrides,
@@ -79,9 +81,33 @@ describe('editor client', () => {
       openView: true,
       requestPanel: true,
       commands: true,
+      editorContext: true,
     })
     expect(editor.settings).toEqual({ 'template.greeting': 'hello' })
     expect(transport.posted.filter((item) => item.type === 'plugin/request-file')).toHaveLength(0)
+  })
+
+  it('exposes the editor instance id and degrades to null', async () => {
+    const current = await connect(init({ editor: { instanceId: 'editor-1' } }))
+    expect(current.editor.instanceId).toBe('editor-1')
+
+    const older = await connect(init({ editor: null }))
+    expect(older.editor.instanceId).toBeNull()
+  })
+
+  it('rejects a malformed editor instance block', async () => {
+    const transport = new FakePluginTransport({
+      hostOrigin: SHELL_ORIGIN,
+      sessionId: SESSION_ID,
+      mode: 'editor',
+    })
+    const promise = connectPlugin({ transport })
+    transport.emit({
+      exo: 1,
+      type: 'shell/init',
+      payload: init({ editor: { instanceId: 1 } as never }),
+    })
+    await expect(promise).rejects.toMatchObject({ code: 'protocol-violation' })
   })
 
   it('reads text and binary content by correlated id', async () => {
@@ -409,6 +435,7 @@ describe('editor client', () => {
         openView: true,
         requestPanel: true,
         commands: true,
+        editorContext: true,
       },
     })
     await expect(old.editor.publishLocal('local/state', {})).rejects.toMatchObject({
@@ -562,6 +589,7 @@ describe('editor client', () => {
         openView: true,
         requestPanel: true,
         commands: true,
+        editorContext: true,
       },
     })
     await expect(denied.editor.requestFiles()).rejects.toMatchObject({ code: 'permission-denied' })
@@ -657,6 +685,7 @@ describe('editor client', () => {
         openView: true,
         requestPanel: true,
         commands: true,
+        editorContext: true,
       },
     })
     await expect(old.editor.listDirectory('/')).rejects.toMatchObject({

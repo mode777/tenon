@@ -95,10 +95,12 @@ function workspace(train = trainScene()): LoadedWorkspace {
 function mockClient() {
   const saveHandlers: Array<() => { text: string }> = []
   const dirty: boolean[] = []
+  const requestPanel = vi.fn(async (panel: string) => ({ panel, open: true }))
   const client = {
     file: { path: '/levels/level01.scene.json' },
-    capabilities: { write: true, directoryListing: true },
-    initialization: { permissions: ['workspace:write'] },
+    instanceId: null,
+    capabilities: { write: true, directoryListing: true, requestPanel: true },
+    initialization: { permissions: ['workspace:write', 'events:subscribe'] },
     setDirty: (value: boolean) => dirty.push(value),
     onSaveRequest: (handler: () => { text: string }) => {
       saveHandlers.push(handler)
@@ -109,14 +111,21 @@ function mockClient() {
     onDispose: () => () => undefined,
     onError: () => () => undefined,
     requestSave: vi.fn(),
+    requestPanel,
     openFile: vi.fn(async () => ({ ok: true })),
+    publishLocal: vi.fn(async (topic: string) => ({ topic, seq: 1 })),
+    subscribeLocal: vi.fn(async (topic: string) => ({ topic, seq: 1 })),
+    subscribe: vi.fn(async (topic: string) => ({ topic, seq: 1 })),
+    unsubscribe: vi.fn(),
+    onLocalEvent: () => () => undefined,
+    onEvent: () => () => undefined,
     readFile: async () => ({
       path: '/levels/level01.scene.json',
       version: 'v1',
       text: JSON.stringify(levelScene()),
     }),
   } as unknown as EditorClient
-  return { client, saveHandlers, dirty }
+  return { client, saveHandlers, dirty, requestPanel }
 }
 
 function StubViewport(_props: SceneViewportProps) {
@@ -124,7 +133,7 @@ function StubViewport(_props: SceneViewportProps) {
 }
 
 function renderEditor(doc = levelScene(), ws = workspace()) {
-  const { client, saveHandlers, dirty } = mockClient()
+  const { client, saveHandlers, dirty, requestPanel } = mockClient()
   const result = render(
     <SceneEditor
       client={client}
@@ -136,7 +145,7 @@ function renderEditor(doc = levelScene(), ws = workspace()) {
       Viewport={StubViewport}
     />,
   )
-  return { ...result, client, saveHandlers, dirty }
+  return { ...result, client, saveHandlers, dirty, requestPanel }
 }
 
 afterEach(() => {
@@ -145,7 +154,7 @@ afterEach(() => {
 })
 
 describe('SceneEditor', () => {
-  it('renders the hierarchy, palette, inspector, and level badge', () => {
+  it('renders the hierarchy, palette, and level badge', () => {
     renderEditor()
     expect(screen.getByText('level01.scene.json')).toBeTruthy()
     expect(screen.getByText('Level')).toBeTruthy()
@@ -153,6 +162,17 @@ describe('SceneEditor', () => {
     expect(screen.getByRole('button', { name: /button_1/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /game:engine/ })).toBeTruthy()
     expect(screen.getByTestId('viewport')).toBeTruthy()
+    expect(screen.queryByLabelText('Entity name')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Public surface/ })).toBeNull()
+  })
+
+  it('reveals the shell inspector and inspection panels', async () => {
+    const user = userEvent.setup()
+    const { requestPanel } = renderEditor()
+    await user.click(screen.getByRole('button', { name: 'Inspector' }))
+    expect(requestPanel).toHaveBeenCalledWith('tenon.scene.inspector', 'show')
+    await user.click(screen.getByRole('button', { name: /Inspection/ }))
+    expect(requestPanel).toHaveBeenCalledWith('tenon.scene.inspection', 'show')
   })
 
   it('adds an entity from the palette and reports dirty', async () => {
@@ -189,58 +209,11 @@ describe('SceneEditor', () => {
 
   it('places a glb asset as a mesh entity', async () => {
     const user = userEvent.setup()
-    renderEditor()
+    const { saveHandlers } = renderEditor()
     await user.click(screen.getByRole('button', { name: 'Assets' }))
     await user.click(await screen.findByRole('button', { name: 'Place' }))
     expect((await screen.findAllByText('mesh_1')).length).toBeGreaterThan(0)
-    expect(screen.getByDisplayValue('assets/cube.glb')).toBeTruthy()
-  })
-
-  it('reparents an entity into a scene instance slot', async () => {
-    const user = userEvent.setup()
-    renderEditor()
-    await user.click(screen.getByRole('button', { name: /game:engine/ }))
-    expect((await screen.findAllByText('engine_1')).length).toBeGreaterThan(0)
-    await user.selectOptions(screen.getByLabelText('Parent'), 'train_1')
-    expect(await screen.findByLabelText('Slot')).toBeTruthy()
-    await user.selectOptions(screen.getByLabelText('Slot'), 'button_0')
-    expect((screen.getByLabelText('Slot') as HTMLSelectElement).value).toBe('button_0')
-  })
-
-  it('adds field promotions and slots', async () => {
-    const user = userEvent.setup()
-    renderEditor()
-    await user.click(screen.getByRole('button', { name: /Public surface/ }))
-    await user.type(screen.getByLabelText('Promotion name'), 'powerPublic')
-    await user.selectOptions(screen.getByLabelText('Promotion target'), 'power')
-    await user.click(screen.getByRole('button', { name: 'Promote' }))
-    expect((await screen.findAllByText('powerPublic')).length).toBeGreaterThan(0)
-
-    await user.type(screen.getByLabelText('Slot name'), 'mount_0')
-    await user.selectOptions(screen.getByLabelText('Slot anchor'), 'button_1')
-    await user.click(screen.getByRole('button', { name: 'Add slot' }))
-    expect((await screen.findAllByText('mount_0')).length).toBeGreaterThan(0)
-  })
-
-  it('expands scene instances into concrete entities', async () => {
-    const user = userEvent.setup()
-    renderEditor()
-    await user.click(screen.getByRole('button', { name: /Debug expansion/ }))
-    expect(await screen.findByText(/resolved entities/)).toBeTruthy()
-    await waitFor(() =>
-      expect(screen.getByText(/train_1::engine/)).toBeTruthy(),
-    )
-    expect(screen.getByText(/train_1::button_anchor/)).toBeTruthy()
-  })
-
-  it('selects an entity from a validation issue', async () => {
-    const user = userEvent.setup()
-    const bad = levelScene()
-    bad.entities[1].scene = 'scenes/missing.scene.json'
-    renderEditor(bad, workspace())
-    expect(await screen.findByText('missing-scene')).toBeTruthy()
-    await user.click(screen.getAllByRole('button', { name: 'Select train_1' })[0])
-    expect(await screen.findByLabelText('Scene document')).toBeTruthy()
+    expect(saveHandlers[0]().text).toContain('"mesh": "assets/cube.glb"')
   })
 
   it('disables editing in a read-only workspace', () => {

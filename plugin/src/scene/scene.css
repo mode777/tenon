@@ -276,25 +276,17 @@ input[type='checkbox'] {
 
 .scene-body {
   display: grid;
-  grid-template-columns: minmax(220px, 250px) minmax(260px, 1fr) minmax(270px, 330px);
+  grid-template-columns: minmax(220px, 250px) minmax(260px, 1fr);
   flex: 1;
   min-height: 0;
 }
 
-.scene-left,
-.scene-right {
+.scene-left {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--exo-surface);
-}
-
-.scene-left {
   border-right: 1px solid var(--exo-border);
-}
-
-.scene-right {
-  border-left: 1px solid var(--exo-border);
+  background: var(--exo-surface);
 }
 
 .scene-panel {
@@ -817,6 +809,75 @@ input[type='checkbox'] {
   display: none;
 }
 
+.scene-panel-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--exo-surface);
+}
+
+.scene-panel-surface {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--exo-surface);
+}
+
+.scene-panel-error {
+  flex: 0 0 auto;
+  margin: 6px 8px 0;
+}
+
+.scene-inspector-panel .scene-panel-heading,
+.scene-inspection-panel .scene-drawer-tabs {
+  flex: 0 0 auto;
+}
+
+.scene-inspection-panel .scene-drawer-body {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+.scene-panel-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  min-height: 0;
+  padding: 18px;
+}
+
+.scene-panel-empty-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--exo-accent) 22%, var(--exo-surface));
+  color: var(--exo-link);
+  font-weight: 700;
+}
+
+.scene-panel-empty h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.scene-panel-empty p {
+  max-width: 360px;
+  margin: 0;
+  color: var(--exo-muted-fg);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .scene-issue-list {
   display: flex;
   flex-direction: column;
@@ -976,7 +1037,7 @@ input[type='checkbox'] {
 
 @media (max-width: 980px) {
   .scene-body {
-    grid-template-columns: minmax(190px, 220px) minmax(200px, 1fr) minmax(230px, 280px);
+    grid-template-columns: minmax(190px, 220px) minmax(200px, 1fr);
   }
 }
 

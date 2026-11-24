@@ -96,6 +96,11 @@ export class EditorClient extends FrameClient {
     return this.metadata
   }
 
+  /** The opaque frame id used by active-editor context and local-event `from`. */
+  get instanceId(): string | null {
+    return this.editorInit.editor?.instanceId ?? null
+  }
+
   get capabilities() {
     return this.editorInit.capabilities
   }

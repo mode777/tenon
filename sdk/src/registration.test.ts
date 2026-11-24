@@ -20,7 +20,7 @@ function init(): RegistrationInit {
     permissions: ['workspace:read', 'workspace:write'],
     locale: 'en',
     settings: {},
-    capabilities: { localEvents: true, newFiles: true },
+    capabilities: { localEvents: true, newFiles: true, bottomPanel: true },
   }
 }
 
@@ -34,10 +34,14 @@ async function connect() {
   transport.emit({ exo: 1, type: 'shell/init', payload: init() })
   const connection = await promise
   if (connection.mode !== 'register') throw new Error('expected register mode')
-  return { transport, registration: connection.registration }
+  return { transport, registration: connection.registration, init: connection.init }
 }
 
 describe('registration client', () => {
+  it('exposes the bottomPanel registration capability', async () => {
+    const { init } = await connect()
+    expect(init.capabilities.bottomPanel).toBe(true)
+  })
   it('registers and completes once', async () => {
     const { transport, registration } = await connect()
     registration.register({ glob: '**/*.template.txt', entry: 'editor.html' })
@@ -226,7 +230,7 @@ describe('new-file template registration', () => {
     const gate = new MessageGate(transport)
     const registration = new RegistrationClient(gate, {
       ...init(),
-      capabilities: { localEvents: true, newFiles: false },
+      capabilities: { localEvents: true, newFiles: false, bottomPanel: false },
     })
     expect(() => registration.registerNewFile('component')).toThrowError(
       expect.objectContaining({ code: 'unsupported-message' }),

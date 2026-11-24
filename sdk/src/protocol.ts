@@ -5,7 +5,7 @@
  */
 
 export const PROTOCOL_VERSION = '1'
-export const SDK_VERSION = '1.8.0'
+export const SDK_VERSION = '1.10.0'
 
 export const READY_TIMEOUT_MS = 10_000
 export const REGISTRATION_TIMEOUT_MS = 10_000
@@ -110,6 +110,8 @@ export interface EditorCapabilities {
   requestPanel: boolean
   /** Shell support bit for `shell/command`; absent on older shells. */
   commands: boolean
+  /** Shell support bit for `editor.instanceId`, `activeEditor` and `editor/active`. */
+  editorContext: boolean
 }
 
 export type ViewCapabilities = EditorCapabilities
@@ -119,6 +121,8 @@ export interface RegistrationCapabilities {
   localEvents: boolean
   /** Shell support bit for `contributes.newFiles` registration. */
   newFiles: boolean
+  /** Shell support bit for the `bottom` panel location. */
+  bottomPanel: boolean
 }
 
 export interface FilePickerOptions {
@@ -190,6 +194,8 @@ export interface RegistrationInit extends ShellInitBase {
 export interface EditorInit extends ShellInitBase {
   mode: 'editor'
   file: FileMetadata
+  /** Present on a shell that supports editor context; `null` on an older shell. */
+  editor: { instanceId: string } | null
   capabilities: EditorCapabilities
   limits: EditorLimits
 }
@@ -205,15 +211,38 @@ export interface ViewInitData {
   id: string
   title: string
   instanceId: string
-  location?: 'primary' | 'secondary'
+  location?: 'primary' | 'secondary' | 'bottom'
   /** One-shot data from the opener; never file content. */
   payload?: unknown
   openedBy?: ViewOpenedBy
 }
 
+export interface ActiveContentView {
+  pluginId: string
+  viewId: string
+  instanceId: string
+  instanceKey: string
+}
+
+export interface ActiveEditor {
+  pluginId: string
+  path: string
+  instanceId: string
+}
+
 export interface ViewInit extends ShellInitBase {
   mode: 'view'
   view: ViewInitData
+  /**
+   * The content view whose tab is active when this frame starts, limited to
+   * this plugin. `null` when another surface or no tab is active.
+   */
+  activeContentView: ActiveContentView | null
+  /**
+   * The active file editor of this plugin when its tab is active. `null` when
+   * another surface or no tab is active, or on an older shell.
+   */
+  activeEditor: ActiveEditor | null
   capabilities: ViewCapabilities
   limits: EditorLimits
 }
@@ -317,6 +346,8 @@ export const EVENT_TOPICS = [
   'workspace/file-changed',
   'workspace/closed',
   'config/changed',
+  'view/active',
+  'editor/active',
 ] as const
 
 export type EventTopic = (typeof EVENT_TOPICS)[number]
@@ -345,11 +376,27 @@ export interface ConfigChangedPayload {
   values: Record<string, unknown>
 }
 
+export type ViewActivePayload =
+  | { pluginId: string; active: false }
+  | {
+      pluginId: string
+      active: true
+      viewId: string
+      instanceId: string
+      instanceKey: string
+    }
+
+export type EditorActivePayload =
+  | { pluginId: string; active: false }
+  | { pluginId: string; active: true; path: string; instanceId: string }
+
 export interface EventPayloads {
   'theme/changed': ThemeChangedPayload
   'workspace/file-changed': FileChangedPayload
   'workspace/closed': WorkspaceClosedPayload
   'config/changed': ConfigChangedPayload
+  'view/active': ViewActivePayload
+  'editor/active': EditorActivePayload
 }
 
 export interface ShellEvent<T = unknown> {

@@ -52,6 +52,7 @@ function editorInit(overrides: Partial<EditorInit> = {}): EditorInit {
       mtime: 1000,
       version: 'v1',
     },
+    editor: null,
     capabilities: {
       read: true,
       write: false,
@@ -64,6 +65,7 @@ function editorInit(overrides: Partial<EditorInit> = {}): EditorInit {
       openView: true,
       requestPanel: true,
       commands: true,
+      editorContext: true,
     },
     limits: { maxFileSize: 1024, maxRequestBytes: 1024 },
     ...overrides,
@@ -82,6 +84,8 @@ function viewInit(overrides: Partial<ViewInit> = {}): ViewInit {
     permissions: ['workspace:read'],
     locale: 'en',
     settings: {},
+    activeContentView: null,
+    activeEditor: null,
     view: { kind: 'panel', id: 'reports', title: 'Reports', instanceId: 'panel:x' },
     capabilities: {
       read: true,
@@ -95,6 +99,7 @@ function viewInit(overrides: Partial<ViewInit> = {}): ViewInit {
       openView: true,
       requestPanel: true,
       commands: true,
+      editorContext: true,
     },
     limits: { maxFileSize: 1024, maxRequestBytes: 1024 },
     ...overrides,

@@ -1,7 +1,7 @@
 # M2 demo workspace
 
 A complete Tenon M2 project: schemas, a reusable train scene, a level that instances
-it, and a GLB mesh asset.
+it, and a GLB mesh asset. Requires Exo shell **0.10.0+** for the scene panels.
 
 ```text
 m2-workspace/
@@ -29,8 +29,9 @@ m2-workspace/
 4. Open `levels/level01.scene.json`. The train is a scene instance; the button is
    attached to its `button_0` slot.
 5. Move the train. The attached button moves with it.
-6. Select the train instance, override the promoted `power` field, and inspect the
-   **Public surface** and **Debug expansion** drawer tabs.
+6. Select the train instance, override the promoted `power` field in the **Inspector**
+   panel, and inspect the **Public surface** and **Debug expansion** tabs in the
+   **Inspection** bottom panel.
 
 ## What it demonstrates
 
