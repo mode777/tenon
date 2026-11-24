@@ -69,10 +69,16 @@ still planned; do not create them just to "verify" a doc.
   instantiable and map to one engine class.
 - Defaults resolve through definition composition, then the instance. Runtime gets one
   flat property map; the engine never sees definitions or composition.
-- Schema identity is `namespace@version`; project imports map namespaces to locations.
-  `basic3d` is builtin, immutable, and read-only; new scenes default to
-  `basic3d@<current>` with a `basic3d:node` root. Locations may be `builtin:`,
-  project-relative, or HTTPS; never absolute `file://` URLs in projects.
+- Schema identity is `namespace@version`; a bundle declares its dependencies as
+  exact `imports`, and project imports map namespaces to locations. Imported
+  definitions are read-only and compose like builtin definitions; their enums are
+  referenced as `namespace:Enum`. `basic3d` is builtin, implicit, immutable, and
+  read-only; new scenes default to `basic3d@<current>` with a `basic3d:node` root.
+  Locations may be `builtin:`, project-relative, or HTTPS; never absolute
+  `file://` URLs in projects.
+- Changing a bundle namespace rewrites that bundle's own definition IDs and local
+  qualified references only. Cross-file refactors are never performed in the
+  background; dependent documents surface validation errors.
 - Mesh files are assets under `assets/`, referenced by `assetRef` fields. Adding one
   does not create entities; an instance of a mesh definition places one.
 - Scene instances are atomic: internals are read-only from the host, and host content

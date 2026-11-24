@@ -10,7 +10,8 @@ A **level** is simply a scene document used as the top-level world.
 
 | Concept | Definition |
 |---|---|
-| **Schema bundle** | A versioned, namespaced JSON file containing enums and entity definitions. Builtin, project-local, or remote. |
+| **Schema bundle** | A versioned, namespaced JSON file containing enums and entity definitions. Builtin, project-local, or remote; it can import other bundles as versioned packages. |
+| **Schema package** | A declared, exactly versioned schema import. Its definitions are read-only and compose like builtin definitions; its enums are referenced as `namespace:Enum`. |
 | **Entity definition** | A named schema entry with fields, defaults, optional events, and optional composition. Concrete definitions are instantiable; abstract definitions are not. |
 | **Abstract definition** | A non-instantiable definition used as a base or mixin. Hidden from the entity palette and has no engine class. |
 | **Definition composition** | A schema/build-time `compose` list that includes fields, defaults, and events from abstract or concrete definitions. Flattened before runtime; never runtime inheritance. |
@@ -31,17 +32,18 @@ map to one engine class. Transforms are built-in placement data, not fields.
 
 - Project schema bundles are checked in; remote bundles resolve through imports. Builtin bundles ship with the Tenon plugin and engine (TD-25).
 - Each bundle declares a namespace and a version.
+- A bundle may import other schemas as versioned packages (`imports`), then compose their definitions or reference their enums (TD-29). Imported definitions are read-only.
 - The project manifest maps namespaces to locations; scenes require `namespace@version`.
 - `basic3d` is the builtin default. Its reference schema is [basic3d.schema.json](basic3d.schema.json). It is read-only and extended by composition, not edited.
-- The schema editor is a first-class part of Tenon. Definitions, abstract flags, composition, fields, enums, defaults, and events are authored there.
+- The schema editor is a first-class part of Tenon. Definitions, abstract flags, composition, fields, enums, defaults, and events are authored there. The bundle namespace is editable; changing it rewrites this bundle's own qualified IDs.
 - The engine aligns to the schema. The schema is the shared data contract for editor UI, validation, and engine registration.
 - Definitions are data-only. Behavior is implemented by the engine class.
 - Field defaults resolve as: **composed definition default → composing definition override → instance value**. A field without a default is required.
 - Each inherited field has one origin definition. Two different origins with the same field name are a schema error; a definition may override an inherited default only with the same field type.
 - Abstract definitions are hidden from the palette, cannot be scene roots, and have no engine class.
-- A concrete definition may be composed into another definition. Only its fields, defaults, and events contribute; it remains instantiable, and its engine class is not inherited.
+- A concrete definition may be composed into another definition from the same bundle, builtin `basic3d`, or a declared import. Only its fields, defaults, and events contribute; it remains instantiable, and its engine class is not inherited.
 - Transforms are not part of the schema. Every entity instance has one (see [Transforms](#transforms)).
-- At runtime, composition is flattened into one flat property list. The engine never sees definitions or composition.
+- At runtime, composition is flattened into one flat property list. The engine never sees definitions, imports, or composition.
 
 ## Default scene
 
@@ -251,12 +253,16 @@ host scene, and host content attaches only through declared slots.
 
 ### Schema editor
 
+- Editable bundle identity: `id`, `namespace`, and `version`.
 - Definition tree grouped by namespace, with abstract and concrete definitions.
+- Imported schema packages shown read-only; import add/remove in the sidebar.
 - Forms for composition, fields, enums, defaults, events, and documentation;
   editor hints are a later schema feature.
-- Composition picker that prevents cycles and shows effective fields and events.
+- Composition picker that spans own, builtin, and imported definitions, prevents
+  cycles, and shows effective fields and events.
 - Read-only view of the builtin `basic3d` bundle shipped with the plugin.
-- Schema validation with actionable errors.
+- Schema validation for imports, cross-bundle composition, enums, and defaults with
+  actionable errors.
 - No behavior, engine class, or script authoring.
 
 The schema editor UI and its M1 scope are specified in [Schema editor UI](schema-editor-ui.md).
@@ -341,7 +347,7 @@ instance transform places the whole door scene.
 ## Workflow summary
 
 ```text
-open project in Exo → define schema → create scene/entities → compose scenes → validate → build (CLI/CI) → playtest
+open project in Exo → define/import schemas → create scene/entities → compose scenes → validate → build (CLI/CI) → playtest
 ```
 
 Authoring happens in the Tenon format editors inside Exo. The build and playtest

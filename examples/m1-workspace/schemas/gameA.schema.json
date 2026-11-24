@@ -2,6 +2,9 @@
   "id": "com.example.gameA",
   "version": "1.0.0",
   "namespace": "gameA",
+  "imports": {
+    "shared": "1.0.0"
+  },
   "enums": {
     "ButtonStyle": {
       "values": ["primary", "secondary"]
@@ -29,7 +32,7 @@
       }
     },
     "gameA:button": {
-      "compose": ["gameA:renderable", "gameA:damageable"],
+      "compose": ["gameA:renderable", "gameA:damageable", "shared:tintable"],
       "fields": {
         "label": { "type": "string", "default": "Press" },
         "enabled": { "type": "bool", "default": true },

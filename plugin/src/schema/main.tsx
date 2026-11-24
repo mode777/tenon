@@ -1,9 +1,15 @@
+import type { EditorClient } from '@exo/plugin-sdk'
 import { connectBrowserPlugin } from '@exo/plugin-sdk/browser'
 import { followTheme } from '@exo/plugin-sdk/theme'
 import '@exo/plugin-sdk/theme.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { parseSchemaText } from '../core/schema'
+import {
+  normalizeSchemaPath,
+  parseSchemaText,
+  type SchemaPackageFile,
+  type SchemaPackageIssue,
+} from '../core/schema'
 import { SchemaEditor } from './SchemaEditor'
 import './schema.css'
 
@@ -26,6 +32,94 @@ function showBootError(root: HTMLElement, message: string, path?: string): void 
       <p class="muted-copy">Fix the file in a text editor, then reopen it. Tenon never silently rewrites an invalid schema.</p>
     </main>
   `
+}
+
+function parseProjectImports(text: string): Record<string, string> {
+  try {
+    const value = JSON.parse(text) as unknown
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
+    const imports = (value as { imports?: unknown }).imports
+    if (typeof imports !== 'object' || imports === null || Array.isArray(imports)) return {}
+    return Object.fromEntries(
+      Object.entries(imports).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string',
+      ),
+    )
+  } catch {
+    return {}
+  }
+}
+
+async function readPackageText(editor: EditorClient, path: string): Promise<string> {
+  if (/^https?:\/\//.test(path)) {
+    const response = await fetch(path)
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    return response.text()
+  }
+  const content = await editor.readFile(path, 'utf8')
+  return content.text
+}
+
+async function loadSchemas(editor: EditorClient, currentNamespace: string): Promise<{
+  packages: SchemaPackageFile[]
+  issues: SchemaPackageIssue[]
+  projectImports: Record<string, string>
+}> {
+  let projectImports: Record<string, string> = {}
+  try {
+    const project = await editor.readFile('/project.json', 'utf8')
+    projectImports = parseProjectImports(project.text)
+  } catch {
+    // A project without project.json still opens; imports resolve by workspace scan.
+  }
+
+  const paths = new Set<string>()
+  const expectedPaths = new Set<string>()
+  for (const location of Object.values(projectImports)) {
+    if (location.startsWith('builtin:')) continue
+    const path = /^https?:\/\//.test(location) ? location : normalizeSchemaPath(location)
+    paths.add(path)
+    expectedPaths.add(path)
+  }
+  if (editor.capabilities.directoryListing) {
+    try {
+      let cursor: string | undefined
+      do {
+        const page = await editor.listDirectory('/schemas', cursor ? { cursor } : {})
+        for (const entry of page.entries) {
+          if (entry.kind === 'file' && entry.path.endsWith('.schema.json')) {
+            paths.add(entry.path)
+          }
+        }
+        cursor = page.nextCursor
+      } while (cursor)
+    } catch {
+      // The project import map still supplies explicit packages.
+    }
+  }
+
+  const currentPath = normalizeSchemaPath(editor.file.path)
+  const packages: SchemaPackageFile[] = []
+  const issues: SchemaPackageIssue[] = []
+  const seen = new Set<string>()
+  for (const path of [...paths].sort((a, b) => a.localeCompare(b))) {
+    const key = /^https?:\/\//.test(path) ? path : normalizeSchemaPath(path)
+    if (key === currentPath || seen.has(key)) continue
+    seen.add(key)
+    try {
+      const bundle = parseSchemaText(await readPackageText(editor, path))
+      if (bundle.namespace === currentNamespace) continue
+      packages.push({ path, bundle })
+    } catch (error) {
+      if (expectedPaths.has(key)) {
+        issues.push({
+          path,
+          message: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+  }
+  return { packages, issues, projectImports }
 }
 
 async function main(): Promise<void> {
@@ -73,9 +167,18 @@ async function main(): Promise<void> {
     editor.capabilities.write &&
     editor.initialization.permissions.includes('workspace:write')
 
+  const workspace = await loadSchemas(editor, initialDoc.namespace)
+
   createRoot(rootElement).render(
     <StrictMode>
-      <SchemaEditor client={editor} initialDoc={initialDoc} canWrite={canWrite} />
+      <SchemaEditor
+        client={editor}
+        initialDoc={initialDoc}
+        canWrite={canWrite}
+        packages={workspace.packages}
+        packageIssues={workspace.issues}
+        projectImports={workspace.projectImports}
+      />
     </StrictMode>,
   )
 }

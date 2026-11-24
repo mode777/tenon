@@ -10,6 +10,7 @@ import { CommitInput, NumberInput } from './Inputs'
 interface ValueEditorProps {
   field: SchemaField
   enums: Record<string, SchemaEnum>
+  enumKey?: string
   disabled?: boolean
   onChange: (value: unknown) => void
   onClear: () => void
@@ -111,9 +112,10 @@ export function ValueEditor(props: ValueEditorProps) {
   const { field, enums, disabled, onChange, onClear } = props
   const hasDefault = fieldHasDefault(field)
   const type = field.type
+  const enumKey = props.enumKey ?? field.enum
 
   const addDefault = () => {
-    onChange(defaultForType(type, enums, field.enum))
+    onChange(defaultForType(type, enums, enumKey))
   }
 
   if (!hasDefault) {
@@ -172,11 +174,11 @@ export function ValueEditor(props: ValueEditorProps) {
         <select
           className="select-input"
           value={typeof field.default === 'string' ? field.default : ''}
-          disabled={disabled || !field.enum}
+          disabled={disabled || !enumKey}
           onChange={(event) => onChange(event.target.value)}
         >
-          {!field.enum && <option value="">Choose an enum first</option>}
-          {(field.enum ? enums[field.enum]?.values ?? [] : []).map((value) => (
+          {!enumKey && <option value="">Choose an enum first</option>}
+          {(enumKey ? enums[enumKey]?.values ?? [] : []).map((value) => (
             <option key={value} value={value}>{value}</option>
           ))}
         </select>

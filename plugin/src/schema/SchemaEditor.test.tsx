@@ -6,6 +6,26 @@ import type { EditorClient } from '@exo/plugin-sdk'
 import { SchemaEditor } from './SchemaEditor'
 import type { SchemaBundle } from '../core/schema'
 
+function shared(): SchemaBundle {
+  return {
+    id: 'com.example.shared',
+    version: '1.0.0',
+    namespace: 'shared',
+    enums: {
+      Kind: { values: ['primary', 'secondary'] },
+    },
+    definitions: {
+      'shared:base': {
+        abstract: true,
+        fields: {
+          weight: { type: 'float', default: 1 },
+          kind: { type: 'enum', enum: 'Kind', default: 'primary' },
+        },
+      },
+    },
+  }
+}
+
 function sample(): SchemaBundle {
   return {
     id: 'com.example.gameA',
@@ -143,5 +163,61 @@ describe('SchemaEditor', () => {
     await user.click(screen.getAllByRole('button', { name: /errors/ })[0])
     expect(screen.getByRole('region', { name: 'Validation' })).toBeTruthy()
     expect(screen.getByText(/does not exist/)).toBeTruthy()
+  })
+
+  it('shows imported packages and their definitions read-only', async () => {
+    const user = userEvent.setup()
+    const bundle = sample()
+    bundle.imports = { shared: '1.0.0' }
+    bundle.definitions['gameA:button'].compose = ['gameA:renderable', 'shared:base']
+    const { client } = mockClient()
+    render(
+      <SchemaEditor
+        client={client}
+        initialDoc={bundle}
+        canWrite
+        packages={[{ path: '/schemas/shared.schema.json', bundle: shared() }]}
+        projectImports={{ shared: 'schemas/shared.schema.json' }}
+      />,
+    )
+    expect(screen.getByText(/shared@1.0.0/)).toBeTruthy()
+    await user.click(screen.getByTitle('shared:base'))
+    expect(screen.getByText(/Imported definition, read-only/)).toBeTruthy()
+    expect(screen.getAllByText('weight').length).toBeGreaterThan(0)
+  })
+
+  it('adds a schema import from the package picker and saves it', async () => {
+    const user = userEvent.setup()
+    const bundle = sample()
+    const { client, saveHandlers } = mockClient()
+    render(
+      <SchemaEditor
+        client={client}
+        initialDoc={bundle}
+        canWrite
+        packages={[{ path: '/schemas/shared.schema.json', bundle: shared() }]}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /Import schema/ }))
+    await user.click(screen.getByRole('button', { name: /shared@1.0.0/ }))
+    await waitFor(() => expect(saveHandlers.length).toBeGreaterThan(0))
+    const saved = JSON.parse(saveHandlers[0]().text)
+    expect(saved.imports).toEqual({ shared: '1.0.0' })
+    expect(screen.getAllByText(/shared@1.0.0/).length).toBeGreaterThan(0)
+  })
+
+  it('renames the namespace and rewrites definition IDs', async () => {
+    const user = userEvent.setup()
+    const { client, saveHandlers } = mockClient()
+    render(<SchemaEditor client={client} initialDoc={sample()} canWrite />)
+    const namespace = screen.getByLabelText('Schema namespace')
+    await user.clear(namespace)
+    await user.type(namespace, 'studio{Enter}')
+    await waitFor(() => expect(saveHandlers.length).toBeGreaterThan(0))
+    const saved = JSON.parse(saveHandlers[0]().text)
+    expect(saved.namespace).toBe('studio')
+    expect(saved.definitions['studio:button']).toBeTruthy()
+    expect(saved.definitions['gameA:button']).toBeUndefined()
+    expect(saved.definitions['studio:button'].compose).toEqual(['studio:renderable'])
   })
 })

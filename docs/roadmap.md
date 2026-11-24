@@ -31,8 +31,8 @@ Rules for every milestone:
 **Build**
 
 - Project manifest and schema location resolution.
-- Schema bundle format: namespaces, versions, enums, entity definitions, abstract flags, composition, fields, events.
-- Schema identity and resolution: `namespace@version`, builtin, project-relative, and HTTPS locations; no local copy of `basic3d`.
+- Schema bundle format: namespaces, versions, package imports, enums, entity definitions, abstract flags, composition, fields, events.
+- Schema identity and resolution: `namespace@version`, declared package dependencies, builtin, project-relative, and HTTPS locations; no local copy of `basic3d`.
 - Default empty scene: current `basic3d@<version>` with a `basic3d:node` root.
 - Entity instance format, including the built-in transform and concrete definition references.
 - Scene document format: flat entity list, root, parent IDs, transforms, promotions, slots.
@@ -53,6 +53,7 @@ The sample loads, resolves defaults, and reports errors for deliberately broken 
 - A schema, scene, and entity instances can be parsed and validated without an editor.
 - A new scene resolves builtin `basic3d` and defaults to a `basic3d:node` root without a local schema copy.
 - Defaults resolve through definition composition, then the instance; omitted transforms resolve to identity.
+- A schema can import another package and compose its definitions; imports resolve to the pinned namespace and version.
 - Abstract definitions cannot be instantiated; composition cycles, field/event collisions, broken references, duplicate IDs, and hierarchy cycles fail with clear errors.
 
 **Not in this milestone:** UI, viewport, generator execution, runtime build.
@@ -70,20 +71,21 @@ The sample loads, resolves defaults, and reports errors for deliberately broken 
 - Project hub panel: schema list and a New Schema action.
 - Open existing schema bundles from the project hub or the Exo file tree.
 - Schema editor frame, designed for usability (see [Schema editor UI](schema-editor-ui.md)):
-  - bundle header for `id`, `namespace`, and `version`;
+  - bundle header for `id`, `namespace`, and `version`; namespace edits rewrite the open bundle's qualified IDs;
+  - schema package imports with exact namespace/version pins, a read-only imported bundle tree, and cross-bundle composition;
   - definition sidebar with abstract/concrete groups, search, create, rename, and delete;
   - definition detail with abstract toggle, documentation, and composition chips;
   - field table with type-aware inline editors, defaults, required state, and origin badges;
   - field type support for `string`, `int`, `float`, `bool`, `enum`, `color`, `vec2`, `vec3`, `assetRef`, and `entityRef`; `array<T>`, `flags`, and `nullable` are preserved but deferred;
-  - enum editor with ordered values;
+  - enum editor with ordered values and qualified imported enum references;
   - event declarations with typed payload fields;
   - effective fields/events view with origin badges;
-  - read-only builtin `basic3d` bundle;
+  - read-only builtin `basic3d` and imported bundles;
   - validation drawer with jump-to-issue;
   - undo/redo per document.
 - Shell integration: dirty, save, save conflict, external change, read-only workspace, and theme behavior.
-- Schema validation: structure, IDs, abstract/concrete rules, composition cycles/collisions, defaults, enum references, and event payloads.
-- The M1 editor uses the open bundle plus builtin `basic3d`; project import editing and remote bundle UI arrive with M2.
+- Schema validation: structure, IDs, imports, abstract/concrete rules, composition cycles/collisions across bundles, defaults, enum references, and event payloads.
+- The M1 editor uses the open bundle plus builtin `basic3d` and its declared schema packages; project import-map editing and the remote bundle UI arrive with M2.
 
 **Demo**
 
@@ -95,17 +97,21 @@ The sample loads, resolves defaults, and reports errors for deliberately broken 
 6. Create enum `ButtonStyle` with `primary` and `secondary`.
 7. Create concrete `gameA:button` composing both, with `label`, `enabled`, a `style` enum field, and a `pressed` event.
 8. Create `gameA:elevatorButton` composing `gameA:button` and override the `label` default.
-9. Inspect `gameA:button` effective fields/events and their origins.
-10. Delete the `primary` enum value used by `gameA:button.style`, confirm validation jumps to the field, then restore it.
-11. Save, close and reopen the workspace, and confirm the schema reloads with the same result.
+9. Create a second schema bundle `shared@1.0.0` with an abstract `shared:tintable` and a `shared:Tone` enum, then return to `gameA`, import it, compose `shared:tintable` into `gameA:button`, and reference `shared:Tone`.
+10. Inspect `gameA:button` effective fields/events and their own, builtin, and imported origins.
+11. Delete the `primary` enum value used by `gameA:button.style`, confirm validation jumps to the field, then restore it.
+12. Change the namespace to `gameB`, confirm the open bundle's IDs are rewritten, then change it back.
+13. Save, close and reopen the workspace, and confirm the schema reloads with the same result.
 
 **Done when**
 
 - The New Schema command is available from the command palette and the project hub, creates a valid bundle, and opens it.
 - The schema editor round-trips the schema format without data loss.
 - Definitions, abstract flags, composition, fields, enums, defaults, and event payloads are editable.
-- Effective fields and events match composition and default rules.
-- Validation catches composition cycles, field/event collisions, duplicate IDs, invalid defaults, missing enums, abstract/concrete errors, and payload errors.
+- Effective fields and events match composition and default rules, including fields and events from imported schema packages.
+- Schema imports pin package versions, resolve read-only, and support imported definitions and qualified imported enums.
+- Changing the namespace rewrites the open bundle's qualified IDs without rewriting another file.
+- Validation catches missing/mismatched/undeclared imports, composition cycles across bundles, field/event collisions, duplicate IDs, invalid defaults, missing enums, abstract/concrete errors, and payload errors.
 - Builtin `basic3d` is read-only and available without a workspace copy.
 - Shell save/reload, dirty, conflict, read-only, and theme behavior work.
 - Adding a definition or field requires no editor code and no modal for the common path.
@@ -113,7 +119,7 @@ The sample loads, resolves defaults, and reports errors for deliberately broken 
 - The MVP acceptance walkthrough in [Schema editor UI](schema-editor-ui.md) passes without hand-edited JSON.
 - The schema editor frame does not load the 3D viewport or scene code.
 
-**Not in this milestone:** scene/level editing, 3D viewport, entity placement, scene composition, runtime events, generators, build/bake, lightmaps, project import editor, remote schema UI, editor hints, cross-file refactors.
+**Not in this milestone:** scene/level editing, 3D viewport, entity placement, scene composition, runtime events, generators, build/bake, lightmaps, project import-map editor, remote schema browser, editor hints, cross-file refactors.
 
 ---
 
@@ -124,7 +130,7 @@ The sample loads, resolves defaults, and reports errors for deliberately broken 
 **Build**
 
 - Project manifest and import resolution for scene schemas.
-- Minimal project editor: import map, resolved schema versions, and project-wide validation.
+- Minimal project editor: import map for the locations of schema packages, resolved schema versions, and project-wide validation.
 - New Scene action on the project hub.
 - Scene editor frame for `scenes/*.scene.json` and `levels/*.scene.json`.
 - 3D viewport with three.js, React Three Fiber, and drei.

@@ -130,6 +130,22 @@ button {
   opacity: 0.7;
 }
 
+.identity-meta-input.text-input {
+  width: 74px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--exo-muted-fg);
+  font-size: 11px;
+}
+
+.identity-meta-input.text-input:focus {
+  outline: 1px solid var(--exo-focus);
+  border-radius: 3px;
+}
+
 .meta-separator {
   opacity: 0.6;
 }
@@ -261,6 +277,58 @@ button {
 
 .builtin-section > summary::-webkit-details-marker {
   display: none;
+}
+
+.import-entry {
+  margin: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--exo-radius);
+}
+
+.import-entry[open] {
+  border-color: var(--exo-border);
+  background: color-mix(in srgb, var(--exo-surface-hover) 45%, transparent);
+}
+
+.import-entry > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.import-entry > summary::-webkit-details-marker {
+  display: none;
+}
+
+.import-version {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--exo-font-mono);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.import-missing {
+  color: var(--exo-warning);
+}
+
+.import-remove {
+  border-style: solid;
+  color: var(--exo-danger);
+}
+
+.import-remove:hover {
+  border-color: var(--exo-danger);
+  color: var(--exo-danger);
+}
+
+.import-picker {
+  padding: 2px 0 4px;
 }
 
 .count-badge,

@@ -8,7 +8,7 @@ The authoring pipeline defines entities, composes them into reusable scenes, and
 
 The editor is designed as one Exo editor plugin. The plugin contributes a separate visual editor for each authoring format — project, schema, scene/level, and generator — while the Exo shell owns the workspace, tabs, dirty state, saves, consent, and theme.
 
-The first editor milestone is the schema editor. It contributes a Tenon project hub panel and a **New Schema** command to the Exo command palette, then authors definitions, composition, fields, enums, and events in a dedicated frame.
+The first editor milestone is the schema editor. It contributes a Tenon project hub panel and a **New Schema** command to the Exo command palette, then authors definitions, composition, fields, enums, and events in a dedicated frame. Schemas can import other schema bundles as versioned packages and compose their definitions.
 
 ## Live editor
 
@@ -45,7 +45,7 @@ Point a workspace's `exo.json` at `http://localhost:5175/exo-manifest.json` whil
 
 ## Status
 
-M1 is implemented: the Tenon Exo plugin, project hub, New Schema command, and the schema editor with definitions, composition, fields, enums, events, effective views, validation, undo/redo, and shell save/conflict handling. The design docs remain the source of truth for the later scene, event, generator, and lightmap milestones.
+M1 is implemented: the Tenon Exo plugin, project hub, New Schema command, and the schema editor with definitions, schema package imports, cross-bundle composition, editable namespace, fields, enums, events, effective views, validation, undo/redo, and shell save/conflict handling. The design docs remain the source of truth for the later scene, event, generator, and lightmap milestones.
 
 ## Repository layout
 

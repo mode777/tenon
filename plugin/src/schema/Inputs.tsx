@@ -6,6 +6,8 @@ export function CommitInput(props: {
   placeholder?: string
   multiline?: boolean
   className?: string
+  title?: string
+  ariaLabel?: string
   onCommit: (value: string) => void
 }) {
   const [draft, setDraft] = useState(props.value)
@@ -39,6 +41,8 @@ export function CommitInput(props: {
       value={draft}
       disabled={props.disabled}
       placeholder={props.placeholder}
+      title={props.title}
+      aria-label={props.ariaLabel}
       onFocus={() => { focused.current = true }}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={() => { focused.current = false; commit() }}

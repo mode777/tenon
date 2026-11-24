@@ -65,7 +65,8 @@ project/                 # Exo workspace root = Tenon project root
 ├─ .exo/                 # Exo shell metadata (optional)
 ├─ project.json          # Tenon project manifest
 ├─ schemas/
-│  └─ gameA.schema.json
+│  ├─ gameA.schema.json
+│  └─ shared.schema.json
 ├─ scenes/
 │  └─ door.scene.json
 ├─ levels/
@@ -99,6 +100,8 @@ never reads, writes, or lists them, and no Tenon format references them. The
 Tenon plugin is installed through the Exo settings surface, not by editing a
 Tenon file.
 
+A schema bundle's own `imports` map declares the package versions it depends on;
+`project.json` remains the project-level map from namespace to location (TD-29).
 `basic3d` is builtin and needs no import entry. Project schemas are checked in;
 builtin and remote schemas resolve through the import map (TD-25). A level is a scene
 document used as the top-level world; `scenes/` and `levels/` share the same document
@@ -113,6 +116,9 @@ A schema bundle is a versioned, namespaced JSON document.
   "id": "com.example.gameA",
   "version": "1.0.0",
   "namespace": "gameA",
+  "imports": {
+    "shared": "1.0.0"
+  },
   "enums": {},
   "definitions": {}
 }
@@ -123,14 +129,15 @@ A schema bundle is a versioned, namespaced JSON document.
 - `basic3d` is the builtin default. Its reference schema is [basic3d.schema.json](basic3d.schema.json).
 - Definition IDs are qualified: `basic3d:mesh`, `gameA:button`. Abstract and concrete definitions share the same ID scheme.
 - A concrete definition's ID is its runtime type ID.
+- A schema bundle may import other schema packages by namespace and exact version (TD-29).
 - Scenes declare the exact bundle versions they require: `"requires": ["basic3d@1.0.0"]`.
 - A project resolves one version per namespace. Composition is valid when the project provides all required bundles.
 - The engine aligns to the schema. The schema is the shared contract for editor UI, validation, and engine registration.
-- Definitions are flat after composition. A definition may compose abstract or concrete definitions (TD-24).
+- Definitions are flat after composition. A definition may compose abstract or concrete definitions from its own, builtin, or imported bundles (TD-24, TD-29).
 - Transforms are a fixed built-in contract, not schema fields or definitions (TD-20).
 - Events are declared on definitions. Composed definitions contribute their event declarations.
 
-Supported field types: `string`, `int`, `float`, `bool`, `enum`, `color`, `vec2`, `vec3`, `entityRef`, `assetRef`, `array<T>`, `flags`, `nullable`. An `enum` field names a bundle enum with its `enum` key (TD-28). The M1 schema editor authors the scalar/vector/enum/reference subset; collection and nullable types are preserved but deferred (TD-27).
+Supported field types: `string`, `int`, `float`, `bool`, `enum`, `color`, `vec2`, `vec3`, `entityRef`, `assetRef`, `array<T>`, `flags`, `nullable`. An `enum` field names a bundle enum with its `enum` key (TD-28). A field may reference an imported enum as `namespace:Enum`. The M1 schema editor authors the scalar/vector/enum/reference subset; collection and nullable types are preserved but deferred (TD-27).
 
 ## TD-05 — Entity definitions
 
@@ -181,8 +188,9 @@ events, and may compose other definitions.
 - Every definition has a qualified ID.
 - `abstract: true` marks a non-instantiable base. Abstract definitions are hidden from the entity palette, cannot be scene roots, and have no engine class.
 - A definition without `abstract` is concrete. Concrete definitions are instantiable, and each maps to one engine class.
-- Any definition may compose abstract or concrete definitions. Composition includes fields, defaults, and event declarations only; it never includes engine classes, behavior, or instantiability (TD-24).
-- A concrete definition used as a component contributes fields, defaults, and events; it remains independently instantiable. Its engine class is not inherited.
+- Any definition may compose abstract or concrete definitions from the same bundle, the builtin schema, or a declared schema import. Composition includes fields, defaults, and event declarations only; it never includes engine classes, behavior, or instantiability (TD-24, TD-29).
+- A concrete definition used as a component contributes fields, defaults, and events; it remains independently instantiable. Its engine class is not inherited. Imported definitions stay read-only.
+- Composition remains a DAG across bundle boundaries; a package cannot compose its way back into a dependent bundle.
 - A field may omit `default`; it is then required on the instance.
 - Definitions are data-only. Behavior is implemented by the engine class selected by a concrete definition's ID.
 - Transform is not a definition or field; every instance has a built-in transform (TD-20).
@@ -395,7 +403,7 @@ An entity references a generator instance:
 Authoring data is JSON. Local files use relative paths; schema imports may also resolve builtin or remote locations.
 
 - Project manifest: `project.json`.
-- Project schema bundles: `schemas/*.schema.json`; builtin and remote bundles resolve through the project import map (TD-25).
+- Project schema bundles: `schemas/*.schema.json`; bundles declare package imports and the project import map resolves their locations (TD-25, TD-29).
 - Scene documents: `scenes/*.scene.json`, `levels/*.scene.json`.
 - Generator definitions: `generators/<name>/generator.json` plus script/graph files.
 - Assets: `assets/`, referenced from entity `assetRef` fields by relative path.
@@ -489,7 +497,9 @@ the project editor, and build-time in the Tenon CLI/CI. The scopes share one rul
 set; the build adds engine registration and artifact checks. It checks:
 
 - schema structure and field types;
-- definition composition targets, cycles, and field/event collisions;
+- schema imports are declared, resolvable, and match the required namespace and version;
+- definition composition targets, cycles, and field/event collisions, including across imported bundles;
+- referenced imported enums exist and match their bundle version;
 - inherited default overrides preserve the field type and do not conflict across paths;
 - abstract definitions are not instantiated or used as scene roots;
 - schema locations resolve and match the required namespace and version;
@@ -659,10 +669,13 @@ location.
 - A new empty scene requires the current `basic3d@<version>` and starts with one `basic3d:node` root.
 - `basic3d` is read-only in the schema editor. Projects extend it by composing its definitions in project schemas; they do not edit it.
 - Builds record the schema versions and hashes they used.
-- Builtin namespaces resolve without a project import entry. An import may select another supported builtin version, but cannot replace a builtin namespace with project or remote content.
+- A schema bundle's `imports` map pins the exact versions of the packages it references (TD-29). The project import map supplies their locations.
+- The schema editor resolves imports from the project map first, then from matching `schemas/*.schema.json` files as an authoring convenience. The build resolves only through the project import map.
+- Imported bundles are read-only in the schema editor. Their definitions may be composed, and their enums may be referenced as `namespace:Enum`.
+- Builtin namespaces resolve without a project import entry. A project import entry may select another supported builtin version, but cannot replace a builtin namespace with project or remote content. Schema `imports` never list `basic3d`; it is always available.
 - Location schemes are `builtin:basic3d@1.0.0`, project-relative paths, and `https://` URLs. Project-relative paths are the portable default for local schemas.
 - `file://` is a CLI-only local convenience, if supported at all. Do not check absolute file URLs into a project; the browser plugin cannot resolve them, and they break portability.
-- Remote schema URLs must resolve to the expected namespace/version, should be pinned by content hash, and must allow CORS from the plugin origin. The plugin caches them in its own storage and treats remote schemas as untrusted.
+- Remote schema URLs must resolve to the expected namespace/version, should be pinned by content hash, and must allow CORS from the plugin origin. The editor may resolve an HTTPS import when the browser allows it; the build still resolves through the project map. Remote bundles are untrusted. Content-hash pinning and caching are resolution hardening, not authoring data.
 - A URL is a location, not an identity. Moving or replacing a URL must not change definition IDs or scene `requires`.
 - Missing, mismatched, or unresolvable schema locations fail validation and block the build.
 
@@ -781,12 +794,16 @@ in [schema-editor-ui.md](schema-editor-ui.md).
   (TD-15).
 - The plugin contributes the `tenon.project` panel and `tenon.new-schema` command
   (TD-26).
-- M1 uses one schema bundle plus builtin `basic3d` as the unit of work. The
-  project editor, import-map editing, and remote bundle UI arrive with the scene
-  editor (M2).
+- M1 uses one open schema bundle plus builtin `basic3d` and its declared schema
+  imports as the unit of work. The project editor, import-map editing, and remote
+  bundle UI arrive with the scene editor (M2).
+- The bundle header edits `id`, `namespace`, and `version`. Changing the namespace
+  rewrites this bundle's definition IDs and local qualified references; it never
+  rewrites another file (TD-29).
 - Definition editing is the primary surface: definitions, abstract/concrete,
-  composition, fields, enums, defaults, events, and payloads. Scene instances,
-  entity placement, and runtime binding are absent.
+  composition, fields, enums, defaults, events, and payloads. Imported definitions
+  are read-only; cross-bundle composition uses the same chips and effective view.
+  Scene instances, entity placement, and runtime binding are absent.
 - M1 edits scalar, vector, enum, and reference field types. `array<T>`, `flags`,
   and `nullable` are preserved but deferred.
 - The editor always exposes an effective view with origin badges; composition is
@@ -823,16 +840,73 @@ enum and defaults to one of its values.
 
 - Enum names are local to the bundle and unique.
 - Values are ordered strings; each value is unique within its enum.
-- A field of type `enum` must name a declared enum in the same bundle. The `enum`
-  key is invalid on other field types.
-- A default must be one of the enum's values. An omitted default makes the field
-  required.
+- A field in the open bundle must name a local enum unqualified, or an imported
+  enum as `namespace:Enum`. The `enum` key is invalid on other field types.
+- Values declared in an imported bundle keep their local unqualified enum reference;
+  it resolves in that bundle's namespace, not in the consumer's bundle.
+- A default must be one of the referenced enum's values. An omitted default makes
+  the field required.
 - Composition carries the field and its enum reference; it does not merge enum
-  declarations. In M1, every referenced enum must be declared in the open bundle;
-  cross-bundle enum identity is deferred with project imports.
+  declarations. Imported enums stay owned by their bundle.
 - Enums are data-only; engine classes interpret the value. Tenon does not add
   engine values, numeric IDs, or behavior.
 - Renaming an enum or value updates references in the open bundle. Other files are
   never rewritten; they surface validation errors.
 - The schema editor may preserve enum syntax it does not yet edit, but it never
   drops it silently.
+
+## TD-29 — Schema packages and namespace edits
+
+A schema can depend on other schema bundles as packages. Identity stays
+`namespace@version`; the dependency is declared in the bundle, and the location
+comes from the project import map (TD-03, TD-25).
+
+```json
+{
+  "id": "com.example.gameA",
+  "version": "1.0.0",
+  "namespace": "gameA",
+  "imports": {
+    "shared": "1.0.0"
+  },
+  "definitions": {
+    "gameA:button": {
+      "compose": ["shared:tintable"],
+      "fields": {
+        "label": { "type": "string", "default": "Press" },
+        "tone": { "type": "enum", "enum": "shared:Tone", "default": "warm" }
+      }
+    }
+  }
+}
+```
+
+- `imports` maps a namespace to one exact version. Version ranges are not part of
+  the format; a project resolves one version per namespace.
+- `basic3d` is implicit and is not listed in `imports`. A bundle cannot import its
+  own namespace or replace a builtin namespace with project content.
+- Imported definitions keep their qualified IDs. `compose` may target own, builtin,
+  or imported definitions; composition still contributes only fields, defaults, and
+  events and never engine classes, behavior, or instantiability (TD-24).
+- Imported definitions are read-only in the schema editor. Browsing, composing, and
+  effective field/event views work exactly as for builtin definitions.
+- An imported enum is referenced as `namespace:Enum`. A field inherited from an
+  imported definition keeps its unqualified enum reference and resolves it in that
+  definition's origin bundle (TD-28).
+- The composition graph is a DAG across package boundaries. Cycles and field/event
+  collisions are schema errors.
+- Missing, mismatched, undeclared, or unresolvable imports are schema errors and
+  block the build. A declared import that resolves to the wrong namespace or version
+  is an error, not a silent fallback.
+- The editor resolves imports from the project import map and may also discover
+  matching schema files under `schemas/` while authoring. The project import map is
+  authoritative for the build.
+- Changing a bundle's namespace rewrites its own definition IDs, its `compose`
+  references to those definitions, and its qualified enum references in the open
+  document. It preserves imports and references to other namespaces. No other file
+  is rewritten; dependent documents surface validation errors.
+- Renaming a namespace or package version is a breaking change for consumers.
+  Authors update `imports` and qualified references deliberately in each document.
+- The project import map editor remains part of the project editor (M2). Until then,
+  a workspace can map imports in `project.json` by hand; the schema editor still
+  resolves adjacent `schemas/*.schema.json` packages for local authoring.

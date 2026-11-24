@@ -15,8 +15,10 @@ schema without hand-editing JSON or learning a second data model.
   composition become editable data.
 - The scene editor then starts from a real schema instead of a hard-coded demo.
 
-The first milestone edits one schema bundle plus the builtin `basic3d` bundle.
-Project import editing and remote bundle UI arrive with M2.
+The first milestone edits one open schema bundle plus the builtin `basic3d`
+bundle and the schema packages it imports. Project import-map editing and remote
+bundle UI still arrive with M2; local imports are resolved from `project.json` and
+matching `schemas/*.schema.json` files.
 
 ## Design principles
 
@@ -107,8 +109,9 @@ This requires **Exo 0.8.0+**, which adds command-scoped user activation for
 checks, size limits, rate limits, and shell-owned dialogs still apply.
 
 The command never writes the file itself and never edits `project.json`. M1
-treats the schema bundle as standalone; project import status and editing arrive
-with M2.
+resolves package locations from `project.json` but does not edit the import map;
+that editing arrives with M2. The new bundle's namespace is a starting value and
+remains editable in the header.
 
 The initial template is intentionally boring:
 
@@ -141,11 +144,12 @@ needed.
 │  button     5 │ ─ inherited ─────────────────────────    │                   │
 │  elevator…  6 │ visible    bool     true   renderable   │                   │
 │               │ castShadows bool    true   renderable   │                   │
+│ Builtin       │ Events (2)                      + Event   │                   │
+│  basic3d   8  │ pressed    —                             │                   │
+│ Imports (1)   │ damaged    amount: float                 │                   │
+│  shared@1.0 2 │                                          │                   │
 │ Enums (1)     │                                          │                   │
-│  ButtonStyle  │ Events (2)                      + Event   │                   │
-│               │ pressed    —                             │                   │
-│ Builtin       │ damaged    amount: float                 │                   │
-│  basic3d   8  │                                          │                   │
+│  ButtonStyle  │                                          │                   │
 ├───────────────┴──────────────────────────────────────────┴───────────────────┤
 │ 0 errors · 1 warning   Field "label" is also contributed by gameA:labelable  │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -153,7 +157,7 @@ needed.
 
 The layout is three panes plus a validation status bar:
 
-- **Left sidebar** — search, definitions, enums, builtin.
+- **Left sidebar** — search, definitions, builtin, imports, enums.
 - **Center** — the selected definition, its fields and events, and the
   effective view.
 - **Right inspector** — the selected field, event, enum, or definition details.
@@ -196,12 +200,43 @@ scrolls horizontally for the common case.
 
 ### Builtin
 
-- `basic3d` appears as a pinned, read-only bundle at the bottom of the sidebar.
+- `basic3d` appears in its own pinned, read-only sidebar section.
 - Expanding it shows its definitions and fields.
 - Its definitions are available to the composition picker but cannot be edited,
   renamed, or deleted.
 - A "Compose from builtin" action on a definition opens the picker filtered to
   `basic3d`.
+
+### Imports
+
+- A schema bundle declares `imports` as an exact `namespace@version` dependency.
+  `basic3d` is implicit and is never listed.
+- Each declared and resolved import appears in the sidebar with its namespace,
+  pinned version, and definition count; expanding it shows read-only definitions.
+- Imported definitions can be composed like builtin definitions. They cannot be
+  edited, renamed, or deleted from the open bundle.
+- `+ Import schema` opens a package picker over the schemas the editor resolved
+  from `project.json` and `schemas/*.schema.json`. Selecting one writes the
+  dependency into the open bundle.
+- Removing an import warns with its usage count in this bundle. References become
+  validation errors rather than being silently removed.
+- An unresolved import shows a `?` badge and a validation error. Omitting it
+  entirely makes references to its namespace an "undeclared import" error.
+- Imported enums appear in enum pickers as `namespace:Enum`; local enums stay
+  unqualified. Imported definition fields resolve their own unqualified enum
+  references in their source bundle.
+- The project import map remains the source of locations for the build. M1 resolves
+  local packages for authoring but does not edit `project.json`.
+
+### Schema identity
+
+- The header edits `id`, `namespace`, and `version`.
+- The namespace is not fixed after definitions exist. Committing a new namespace
+  rewrites this bundle's definition IDs and its references to them in the open
+  document.
+- Other files are never rewritten. A consumer that references the old namespace
+  reports a validation error until its import and references are updated.
+- The namespace cannot be changed to the builtin `basic3d` namespace.
 
 ## Definition detail
 
@@ -221,7 +256,7 @@ The center pane is the definition workspace.
 - One chip per composed definition, with its qualified ID and a remove control.
 - `+` opens the composition picker:
   - searchable;
-  - grouped abstract/concrete and builtin/project;
+  - grouped abstract/concrete and own/imported/builtin;
   - already-composed rows disabled;
   - rows that would create a cycle disabled with a reason;
   - hovering a row previews contributed fields and events;
@@ -297,8 +332,9 @@ Later types:
 
 The picker shows the type name, a one-line description, and a short example.
 Selecting a type replaces the default editor and preserves a compatible default
-when possible. Selecting an enum prompts for one of the bundle's enums; if none
-exist, the picker offers a **New enum** inline action.
+when possible. Selecting an enum prompts for one of the bundle's enums or an
+imported enum shown as `namespace:Enum`; if none exist, the picker offers a
+**New enum** inline action.
 
 ## Field inspector
 
@@ -310,7 +346,7 @@ speed; the inspector is for completeness.
   - `bool`: switch;
   - `int`/`float`: number input with validation;
   - `string`: text input;
-  - `enum`: select from the bundle's enums;
+  - `enum`: select a local or imported enum; imported enums are qualified;
   - `color`: swatch plus hex/rgba input;
   - `vec2`/`vec3`: compact numeric inputs;
   - `entityRef`: no default; entity pickers arrive with the scene editor;
@@ -384,11 +420,15 @@ Validation is live, not a separate "validate" step.
 Initial rules:
 
 - schema `id`, `namespace`, and `version` shape;
+- imports are declared, resolve to the pinned namespace/version, and are not
+  self-references or builtin replacements;
+- references to unimported namespaces are undeclared-import errors;
 - definition IDs qualified and unique;
-- composition targets exist, are acyclic, and are flattened once;
-- duplicate field/event names across origins;
+- composition targets exist across own, builtin, and imported bundles, are acyclic,
+  and are flattened once;
+- duplicate field/event names across origins, including imported origins;
 - default type compatibility and override rules;
-- enum references and value defaults;
+- local and qualified imported enum references and value defaults;
 - event payload field rules;
 - duplicate event names;
 - abstract definitions remain non-instantiable; composition never contributes
@@ -427,9 +467,13 @@ Included:
 
 - Exo plugin scaffold, project hub panel, and the `tenon.new-schema` command.
 - Open, edit, save, reload, and validate a schema bundle.
-- Bundle header: `id`, `namespace`, `version`.
+- Bundle header: `id`, `namespace`, `version`; namespace edits rewrite the open
+  bundle's qualified IDs.
+- Schema packages: declare imports, browse resolved bundles read-only, compose
+  imported definitions, reference imported enums.
 - Definitions: create, rename, delete, abstract/concrete, documentation.
-- Composition: add/remove chips, cycle blocking, effective view.
+- Composition: add/remove chips across own/imported/builtin, cycle blocking,
+  effective view.
 - Fields: add, rename, delete, type, default, required state, move up/down.
 - Field types: `string`, `int`, `float`, `bool`, `enum`, `color`, `vec2`,
   `vec3`, `assetRef`, `entityRef`; `array<T>`, `flags`, and `nullable` are
@@ -445,7 +489,8 @@ Included:
 Not in M1:
 
 - Scene/level editing, 3D viewport, entity placement.
-- Project import map, remote schemas, cross-bundle composition.
+- Project import-map editing and the remote bundle browser. Cross-bundle
+  composition itself is in M1.
 - Generator editor.
 - Runtime events or bindings.
 - Build/bake/playtest.
@@ -471,9 +516,15 @@ These choices are implemented in the M1 plugin:
 5. **Effective view.** A third tab beside Fields and Events, plus origin badges
    in the normal tables. Chosen because composition is the concept that needs
    teaching.
-6. **Project scope.** M1 lists schemas in the project hub but does not edit
-   `project.json` imports; import status arrives with M2. Chosen to keep the first
-   MVP focused.
+6. **Project scope.** M1 lists schemas in the project hub and resolves package
+   locations from `project.json`, but does not edit `project.json`; import-map
+   editing arrives with M2. The open bundle is still the only written document.
+7. **Schema packages.** Imports are declared in the schema bundle as exact
+   namespace/version pins, while `project.json` keeps the location map. This keeps
+   schemas portable and self-describing without duplicating locations.
+8. **Namespace edits.** The namespace stays editable after definitions exist.
+   Committing a change rewrites only this bundle's IDs and references; dependent
+   files report breakage instead of being rewritten in the background.
 
 ## MVP acceptance walkthrough
 
@@ -485,7 +536,12 @@ The M1 walkthrough below needs no hand-edited JSON and was exercised against the
 4. Create an enum with two values.
 5. Create a concrete definition, compose the abstract one, and add an enum
    field.
-6. Inspect the effective view and confirm origin badges.
-7. Delete the enum value used by a default, see the exact error, and restore it.
-8. Declare an event with a typed payload.
-9. Save, close, reopen, and confirm the same definitions and validation.
+6. Create a second schema bundle, return to the first, import it from the
+   sidebar, compose one of its definitions, and add an imported enum reference
+   as `namespace:Enum`.
+7. Inspect the effective view and confirm own, builtin, and imported origin
+   badges.
+8. Delete the enum value used by a default, see the exact error, and restore it.
+9. Declare an event with a typed payload.
+10. Change the namespace, confirm this bundle's IDs are rewritten, then save,
+    close, reopen, and confirm the same definitions, imports, and validation.

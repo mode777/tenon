@@ -5,6 +5,7 @@ import {
   MVP_FIELD_TYPES,
   TYPE_LABELS,
   addDefinition,
+  addImportToBundle,
   allDefinitionIds,
   builtinBundle,
   cloneJson,
@@ -16,13 +17,20 @@ import {
   effectiveDefinition,
   enumUsageCount,
   fieldHasDefault,
-  isBuiltinDefinition,
+  importUsageCount,
+  isImportedDefinition,
   lookupDefinition,
+  lookupFieldEnum,
+  normalizeSchemaPath,
+  packageVersion,
   parseSchemaText,
   qualify,
+  removeImportFromBundle,
   renameDefinitionInBundle,
   renameEnumInBundle,
   renameEnumValueInBundle,
+  renameNamespaceInBundle,
+  resolveSchemaImports,
   schemaToText,
   uniqueLocalName,
   usageCount,
@@ -31,11 +39,14 @@ import {
   type EffectiveDefinition,
   type EffectiveEvent,
   type EffectiveField,
+  type ResolvedSchemaPackages,
   type SchemaBundle,
   type SchemaDefinition,
   type SchemaEnum,
   type SchemaEvent,
   type SchemaField,
+  type SchemaPackageFile,
+  type SchemaPackageIssue,
   type ValidationIssue,
 } from '../core/schema'
 import { FieldEditor } from './FieldEditor'
@@ -52,6 +63,16 @@ interface SchemaEditorProps {
   client: EditorClient
   initialDoc: SchemaBundle
   canWrite: boolean
+  packages?: SchemaPackageFile[]
+  packageIssues?: SchemaPackageIssue[]
+  projectImports?: Record<string, string>
+}
+
+function initialSelection(doc: SchemaBundle, builtin: SchemaBundle): Selection {
+  const own = Object.keys(doc.definitions).sort((a, b) => a.localeCompare(b))[0]
+  if (own) return { kind: 'definition', id: own }
+  const built = Object.keys(builtin.definitions).sort((a, b) => a.localeCompare(b))[0]
+  return built ? { kind: 'definition', id: built } : null
 }
 
 interface HistoryState {
@@ -66,13 +87,6 @@ interface Toast {
 }
 
 const HISTORY_LIMIT = 100
-
-function initialSelection(doc: SchemaBundle, builtin: SchemaBundle): Selection {
-  const own = Object.keys(doc.definitions).sort((a, b) => a.localeCompare(b))[0]
-  if (own) return { kind: 'definition', id: own }
-  const built = Object.keys(builtin.definitions).sort((a, b) => a.localeCompare(b))[0]
-  return built ? { kind: 'definition', id: built } : null
-}
 
 function reorderRecord<T>(record: Record<string, T>, key: string, direction: -1 | 1): Record<string, T> {
   const entries = Object.entries(record)
@@ -172,7 +186,18 @@ function toastClass(kind: Toast['kind']): string {
   return kind === 'error' ? 'banner danger' : 'banner success'
 }
 
-export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps) {
+const EMPTY_PACKAGES: SchemaPackageFile[] = []
+const EMPTY_PACKAGE_ISSUES: SchemaPackageIssue[] = []
+const EMPTY_PROJECT_IMPORTS: Record<string, string> = {}
+
+export function SchemaEditor({
+  client,
+  initialDoc,
+  canWrite,
+  packages = EMPTY_PACKAGES,
+  packageIssues = EMPTY_PACKAGE_ISSUES,
+  projectImports = EMPTY_PROJECT_IMPORTS,
+}: SchemaEditorProps) {
   const builtin = useMemo(() => builtinBundle(), [])
   const { state, update, reset, replace, undo, redo } = useHistory(initialDoc)
   const [savedText, setSavedText] = useState(() => schemaToText(initialDoc))
@@ -205,27 +230,97 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
   docRef.current = state.doc
   dirtyRef.current = dirty
 
-  const validation = useMemo(() => validateSchema(state.doc, builtin), [state.doc, builtin])
+  const resolvedPackages = useMemo(
+    () => resolveSchemaImports(state.doc, packages, projectImports),
+    [state.doc, packages, projectImports],
+  )
+  const importBundles = resolvedPackages.bundles
+  const directImportBundles = useMemo(() => {
+    const direct: Record<string, SchemaBundle> = {}
+    for (const namespace of Object.keys(state.doc.imports ?? {})) {
+      if (importBundles[namespace]) direct[namespace] = importBundles[namespace]
+    }
+    return direct
+  }, [state.doc.imports, importBundles])
+  const enumOptions = useMemo(() => {
+    const options: Record<string, SchemaEnum> = { ...(state.doc.enums ?? {}) }
+    for (const [namespace, imported] of Object.entries(directImportBundles)) {
+      for (const [name, enumDef] of Object.entries(imported.enums ?? {})) {
+        options[`${namespace}:${name}`] = enumDef
+      }
+    }
+    return options
+  }, [state.doc.enums, directImportBundles])
+  const firstEnumKey = useMemo(
+    () => Object.keys(enumOptions).sort((a, b) => a.localeCompare(b))[0],
+    [enumOptions],
+  )
+  const declaredImportPaths = useMemo(() => {
+    const paths = new Set<string>()
+    for (const namespace of Object.keys(state.doc.imports ?? {})) {
+      const location = projectImports[namespace]
+      if (!location) continue
+      paths.add(/^https?:\/\//.test(location) ? location : normalizeSchemaPath(location))
+    }
+    return paths
+  }, [state.doc.imports, projectImports])
+
+  const validation = useMemo(() => {
+    const result = validateSchema(state.doc, builtin, importBundles)
+    const extra: ValidationIssue[] = [
+      ...resolvedPackages.issues,
+      ...packageIssues
+        .filter((item) => {
+          const path = /^https?:\/\//.test(item.path) ? item.path : normalizeSchemaPath(item.path)
+          return declaredImportPaths.has(path)
+        })
+        .map((item) => ({
+          severity: 'error' as const,
+          code: 'package-load',
+          message: `${item.path}: ${item.message}`,
+        })),
+    ]
+    if (extra.length === 0) return result
+    const issues = [...result.issues, ...extra]
+    return {
+      issues,
+      errors: issues.filter((issue) => issue.severity === 'error').length,
+      warnings: issues.filter((issue) => issue.severity === 'warning').length,
+    }
+  }, [
+    state.doc,
+    builtin,
+    importBundles,
+    resolvedPackages.issues,
+    packageIssues,
+    declaredImportPaths,
+  ])
   const selectedDefinitionId = selection?.kind === 'definition' ? selection.id : null
   const selectedEnumName = selection?.kind === 'enum' ? selection.name : null
   const selectedLookup = selectedDefinitionId
-    ? lookupDefinition(selectedDefinitionId, state.doc, builtin)
+    ? lookupDefinition(selectedDefinitionId, state.doc, builtin, importBundles)
     : null
   const selectedDefinition = selectedLookup?.definition ?? null
-  const selectedIsBuiltin = selectedDefinitionId
-    ? isBuiltinDefinition(selectedDefinitionId, state.doc, builtin)
+  const selectedIsBuiltin = selectedLookup?.source === 'builtin'
+  const selectedIsImported = selectedDefinitionId
+    ? isImportedDefinition(selectedDefinitionId, state.doc, builtin, importBundles)
     : false
   const selectedEffective = useMemo(
-    () => (selectedDefinitionId ? effectiveDefinition(selectedDefinitionId, state.doc, builtin) : null),
-    [selectedDefinitionId, state.doc, builtin],
+    () => (
+      selectedDefinitionId
+        ? effectiveDefinition(selectedDefinitionId, state.doc, builtin, importBundles)
+        : null
+    ),
+    [selectedDefinitionId, state.doc, builtin, importBundles],
   )
   const selectedEnum = selectedEnumName ? state.doc.enums?.[selectedEnumName] : undefined
-  const editable = canWrite && Boolean(selectedDefinitionId) && !selectedIsBuiltin
+  const selectedIsOwn = Boolean(selectedDefinitionId && state.doc.definitions[selectedDefinitionId])
+  const editable = canWrite && selectedIsOwn && !selectedIsBuiltin
 
   useEffect(() => {
     if (!selection) return
     if (selection.kind === 'definition') {
-      if (!lookupDefinition(selection.id, state.doc, builtin)) {
+      if (!lookupDefinition(selection.id, state.doc, builtin, importBundles)) {
         setSelection(initialSelection(state.doc, builtin))
         setSelectedFieldName(null)
         setSelectedEventName(null)
@@ -236,7 +331,7 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
     if (!state.doc.enums?.[selection.name]) {
       setSelection(initialSelection(state.doc, builtin))
     }
-  }, [state.doc, selection, builtin])
+  }, [state.doc, selection, builtin, importBundles])
 
   useEffect(() => {
     client.setDirty(dirty)
@@ -415,6 +510,50 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
     })
   }
 
+  const renameBundleNamespace = (namespace: string) => {
+    if (!canWrite) return
+    const clean = namespace.trim()
+    if (!clean || clean === state.doc.namespace) return
+    if (clean === builtin.namespace) {
+      showError(`Namespace "${clean}" is reserved for the builtin schema.`)
+      return
+    }
+    const localSelection = selectedIsOwn && selectedDefinitionId
+      ? definitionLocalName(selectedDefinitionId)
+      : null
+    try {
+      const next = renameNamespaceInBundle(state.doc, clean)
+      replace(next)
+      if (localSelection && next.definitions[qualify(clean, localSelection)]) {
+        setSelection({ kind: 'definition', id: qualify(clean, localSelection) })
+      }
+      showNotice(`Namespace changed to ${clean}. Definition IDs in this bundle were rewritten.`)
+    } catch (error) {
+      showError(error)
+    }
+  }
+
+  const addSchemaImport = (namespace: string, version: string) => {
+    if (!canWrite) return
+    try {
+      const next = addImportToBundle(state.doc, namespace, version)
+      replace(next)
+      showNotice(`Imported ${namespace}@${version}.`)
+    } catch (error) {
+      showError(error)
+    }
+  }
+
+  const removeSchemaImport = (namespace: string) => {
+    if (!canWrite) return
+    const uses = importUsageCount(state.doc, namespace)
+    const message = uses > 0
+      ? `Remove the import "${namespace}"? ${uses} reference(s) in this bundle will become invalid.`
+      : `Remove the import "${namespace}"?`
+    if (!window.confirm(message)) return
+    replace(removeImportFromBundle(state.doc, namespace))
+  }
+
   const renameSelectedDefinition = (localName: string) => {
     if (!selectedDefinitionId || !editable) return
     const clean = localName.trim()
@@ -490,7 +629,7 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
         definition.fields = definition.fields ?? {}
         const field: SchemaField = { type: newFieldType }
         if (newFieldType === 'enum') {
-          const firstEnum = Object.keys(state.doc.enums ?? {}).sort((a, b) => a.localeCompare(b))[0]
+          const firstEnum = firstEnumKey
           if (firstEnum) field.enum = firstEnum
         }
         definition.fields[name] = field
@@ -543,7 +682,7 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
       target.payload = target.payload ?? {}
       const field: SchemaField = { type: newPayloadType }
       if (newPayloadType === 'enum') {
-        const firstEnum = Object.keys(state.doc.enums ?? {}).sort((a, b) => a.localeCompare(b))[0]
+        const firstEnum = firstEnumKey
         if (firstEnum) field.enum = firstEnum
       }
       target.payload[name] = field
@@ -576,7 +715,7 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
     updateDefinition(path.definitionId, (definition) => {
       const field: SchemaField = { type: path.type }
       if (path.type === 'enum') {
-        const firstEnum = Object.keys(state.doc.enums ?? {}).sort((a, b) => a.localeCompare(b))[0]
+        const firstEnum = firstEnumKey
         if (firstEnum) field.enum = firstEnum
       }
       if (path.eventName) {
@@ -600,6 +739,24 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
   const selectedPayloadField = selectedEventName && selectedPayloadFieldName && selectedDefinition
     ? selectedDefinition.events?.[selectedEventName]?.payload?.[selectedPayloadFieldName]
     : undefined
+  const selectedFieldEnum = selectedFieldEffective && selectedDefinitionId
+    ? lookupFieldEnum(
+        selectedFieldEffective.field,
+        selectedFieldEffective.origin,
+        state.doc,
+        builtin,
+        importBundles,
+      )
+    : null
+  const selectedPayloadEnum = selectedPayloadField && selectedDefinitionId
+    ? lookupFieldEnum(selectedPayloadField, selectedDefinitionId, state.doc, builtin, importBundles)
+    : null
+  const selectedFieldEnums = selectedFieldEnum
+    ? { ...enumOptions, [selectedFieldEnum.key]: selectedFieldEnum.enumDef }
+    : enumOptions
+  const selectedPayloadEnums = selectedPayloadEnum
+    ? { ...enumOptions, [selectedPayloadEnum.key]: selectedPayloadEnum.enumDef }
+    : enumOptions
 
   const fieldIssues = selectedDefinitionId && selectedFieldName
     ? issuesFor(validation.issues, selectedDefinitionId, selectedFieldName)
@@ -658,11 +815,45 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
       .sort(([a], [b]) => a.localeCompare(b))
   }, [builtin, search])
 
+  const importEntries = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return Object.entries(state.doc.imports ?? {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([namespace, version]) => {
+        const imported = importBundles[namespace]
+        const definitions = Object.entries(imported?.definitions ?? {})
+          .filter(([id]) => !query || id.toLowerCase().includes(query))
+          .sort(([a], [b]) => a.localeCompare(b))
+        return { namespace, version, imported, definitions }
+      })
+  }, [state.doc.imports, importBundles, search])
+
+  const importCandidates = useMemo(() => {
+    const own = state.doc.namespace
+    const declared = state.doc.imports ?? {}
+    return packages
+      .filter((item) => item.bundle.namespace !== own)
+      .filter((item) => item.bundle.namespace !== builtin.namespace)
+      .filter((item) => declared[item.bundle.namespace] !== item.bundle.version)
+      .sort((a, b) => {
+        const byNamespace = a.bundle.namespace.localeCompare(b.bundle.namespace)
+        if (byNamespace !== 0) return byNamespace
+        return a.bundle.version.localeCompare(b.bundle.version)
+      })
+  }, [packages, state.doc.namespace, state.doc.imports, builtin.namespace])
+
   const abstractEntries = definitionEntries.filter(([, definition]) => definition.abstract)
   const concreteEntries = definitionEntries.filter(([, definition]) => !definition.abstract)
   const enumNames = Object.keys(state.doc.enums ?? {}).sort((a, b) => a.localeCompare(b))
   const definitionCount = Object.keys(state.doc.definitions).length
   const currentDirtyLabel = dirty ? 'Unsaved changes' : 'Up to date'
+
+  const inheritedOverride = (field: SchemaField, origin: string): SchemaField => {
+    const override = { ...field }
+    const lookup = lookupFieldEnum(field, origin, state.doc, builtin, importBundles)
+    if (lookup) override.enum = lookup.key
+    return override
+  }
 
   const updateSelectedField = (patch: Partial<SchemaField>) => {
     if (!selectedDefinitionId || !selectedFieldName || !editable) return
@@ -673,7 +864,7 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
       updateDefinition(selectedDefinitionId, (definition) => {
         definition.fields = definition.fields ?? {}
         definition.fields[selectedFieldName] = {
-          ...current.field,
+          ...inheritedOverride(current.field, current.origin),
           ...patch,
           type: current.field.type,
         }
@@ -694,7 +885,7 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
     updateDefinition(selectedDefinitionId, (definition) => {
       if (current.inherited) {
         definition.fields = definition.fields ?? {}
-        const override = { ...current.field, type: current.field.type }
+        const override = inheritedOverride(current.field, current.origin)
         delete override.default
         definition.fields[selectedFieldName] = override
       } else {
@@ -735,7 +926,7 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
       if (!field) return
       field.type = type
       if (type === 'enum') {
-        const firstEnum = Object.keys(state.doc.enums ?? {}).sort((a, b) => a.localeCompare(b))[0]
+        const firstEnum = firstEnumKey
         if (firstEnum) field.enum = firstEnum
       } else {
         delete field.enum
@@ -790,7 +981,7 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
       if (!field) return
       field.type = type
       if (type === 'enum') {
-        const firstEnum = Object.keys(state.doc.enums ?? {}).sort((a, b) => a.localeCompare(b))[0]
+        const firstEnum = firstEnumKey
         if (firstEnum) field.enum = firstEnum
       } else {
         delete field.enum
@@ -1059,6 +1250,53 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
           ))}
         </details>
 
+        <section className="nav-section imports-section">
+          <div className="nav-heading">
+            <span>Imports</span>
+            <span className="count-badge">{importEntries.length}</span>
+          </div>
+          {importEntries.length === 0 && <p className="nav-empty">No imported schemas</p>}
+          {importEntries.map((entry) => (
+            <details key={entry.namespace} className="import-entry">
+              <summary className="nav-heading import-summary">
+                <span className="import-version">
+                  {entry.namespace}@{entry.version}
+                  {!entry.imported && <span className="nav-badge">?</span>}
+                </span>
+                <span className="nav-count">{entry.definitions.length}</span>
+              </summary>
+              {!entry.imported && (
+                <p className="nav-empty import-missing">
+                  Not found in this workspace project.
+                </p>
+              )}
+              {entry.definitions.map(([id, definition]) => (
+                <DefinitionRow
+                  key={id}
+                  id={id}
+                  definition={definition}
+                  selected={selectedDefinitionId === id}
+                  issues={validation.issues.filter((issue) => issue.definitionId === id)}
+                  builtin
+                  onSelect={() => selectDefinition(id)}
+                />
+              ))}
+              {canWrite && (
+                <button
+                  type="button"
+                  className="nav-add import-remove"
+                  onClick={() => removeSchemaImport(entry.namespace)}
+                >
+                  Remove import
+                </button>
+              )}
+            </details>
+          ))}
+          {canWrite && (
+            <ImportPicker candidates={importCandidates} onAdd={addSchemaImport} />
+          )}
+        </section>
+
         <section className="nav-section">
           <div className="nav-heading">
             <span>Enums</span>
@@ -1104,6 +1342,7 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
       <div className="sidebar-footer">
         <span>{definitionCount} definitions</span>
         <span>{enumNames.length} enums</span>
+        <span>{importEntries.length} imports</span>
       </div>
     </aside>
   )
@@ -1139,7 +1378,8 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
             inherited={false}
             override={false}
             canEdit={Boolean(editable)}
-            enums={state.doc.enums ?? {}}
+            enums={selectedPayloadEnums}
+            enumKey={selectedPayloadEnum?.key}
             issues={[]}
             onChange={updateSelectedPayloadField}
             onChangeType={changePayloadFieldType}
@@ -1221,7 +1461,8 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
             inherited={selectedFieldEffective.inherited}
             override={selectedFieldEffective.override}
             canEdit={Boolean(editable)}
-            enums={state.doc.enums ?? {}}
+            enums={selectedFieldEnums}
+            enumKey={selectedFieldEnum?.key}
             issues={fieldIssues}
             onChange={updateSelectedField}
             onChangeType={changeFieldType}
@@ -1241,7 +1482,13 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
           <div className="inspector-empty">
             <p className="eyebrow">Definition</p>
             <h3>{selectedDefinitionId ? definitionLocalName(selectedDefinitionId) : 'Definition'}</h3>
-            <p className="muted-copy">{selectedIsBuiltin ? 'Builtin definition, read-only.' : 'Select a field or event to edit it.'}</p>
+            <p className="muted-copy">
+              {selectedIsBuiltin
+                ? 'Builtin definition, read-only.'
+                : selectedIsImported
+                  ? 'Imported definition, read-only. Compose it or reference its fields.'
+                  : 'Select a field or event to edit it.'}
+            </p>
             <div className="palette-preview">
               <div className="preview-head">
                 <span className={selectedDefinition.abstract ? 'badge abstract' : 'badge concrete'}>
@@ -1291,13 +1538,13 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
               onChange={(event) => update((doc) => { doc.id = event.target.value })}
             />
             <div className="identity-meta">
-              <input
+              <CommitInput
                 className="identity-meta-input"
                 value={state.doc.namespace}
-                disabled={!canWrite || definitionCount > 0}
-                title={definitionCount > 0 ? 'Namespace is fixed once definitions exist.' : 'Schema namespace'}
-                aria-label="Schema namespace"
-                onChange={(event) => update((doc) => { doc.namespace = event.target.value })}
+                disabled={!canWrite}
+                title="Changing the namespace rewrites this bundle's definition IDs."
+                ariaLabel="Schema namespace"
+                onCommit={renameBundleNamespace}
               />
               <span className="meta-separator">@</span>
               <input
@@ -1384,6 +1631,7 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
               definitionId={selectedDefinitionId}
               definition={selectedDefinition}
               builtin={selectedIsBuiltin}
+              imported={selectedIsImported}
               editable={editable}
               tab={tab}
               setTab={setTab}
@@ -1406,10 +1654,11 @@ export function SchemaEditor({ client, initialDoc, canWrite }: SchemaEditorProps
                 setTab('events')
               }}
               selectPayloadField={(name) => setSelectedPayloadFieldName(name)}
-              enums={state.doc.enums ?? {}}
-              allIds={allDefinitionIds(state.doc, builtin)}
+              enums={enumOptions}
+              allIds={allDefinitionIds(state.doc, builtin, directImportBundles)}
               bundle={state.doc}
               builtinBundle={builtin}
+              importedBundles={importBundles}
               onRenameDefinition={renameSelectedDefinition}
               onToggleAbstract={toggleAbstract}
               onDeleteDefinition={deleteSelectedDefinition}
@@ -1563,6 +1812,7 @@ function DefinitionWorkspace(props: {
   definitionId: string
   definition: SchemaDefinition
   builtin: boolean
+  imported: boolean
   editable: boolean
   tab: DetailTab
   setTab: (tab: DetailTab) => void
@@ -1579,6 +1829,7 @@ function DefinitionWorkspace(props: {
   allIds: string[]
   bundle: SchemaBundle
   builtinBundle: SchemaBundle
+  importedBundles: Record<string, SchemaBundle>
   onRenameDefinition: (name: string) => void
   onToggleAbstract: () => void
   onDeleteDefinition: () => void
@@ -1623,17 +1874,18 @@ function DefinitionWorkspace(props: {
             />
             <span className="qualified-id">{props.definitionId}</span>
             {props.builtin && <span className="badge readonly">builtin</span>}
+            {props.imported && <span className="badge readonly">imported</span>}
           </div>
           <div className="definition-controls">
             <button
               type="button"
               className={`segmented ${props.definition.abstract ? 'active' : ''}`}
-              disabled={!props.editable || props.builtin}
+              disabled={!props.editable || props.builtin || props.imported}
               onClick={props.onToggleAbstract}
             >
               {props.definition.abstract ? 'Abstract' : 'Concrete'}
             </button>
-            {!props.builtin && (
+            {!props.builtin && !props.imported && (
               <button
                 type="button"
                 className="button ghost tiny danger-text"
@@ -1649,17 +1901,18 @@ function DefinitionWorkspace(props: {
           multiline
           className="definition-doc"
           value={props.definition.doc ?? ''}
-          disabled={!props.editable || props.builtin}
+          disabled={!props.editable || props.builtin || props.imported}
           placeholder="Document this definition for schema authors."
           onCommit={props.onDocChange}
         />
         <CompositionChips
           definitionId={props.definitionId}
           definition={props.definition}
-          editable={props.editable && !props.builtin}
+          editable={props.editable && !props.builtin && !props.imported}
           allIds={props.allIds}
           bundle={props.bundle}
           builtin={props.builtinBundle}
+          imports={props.importedBundles}
           onAdd={props.onAddComposition}
           onRemove={props.onRemoveComposition}
         />
@@ -1954,6 +2207,7 @@ function CompositionChips(props: {
   allIds: string[]
   bundle: SchemaBundle
   builtin: SchemaBundle
+  imports: Record<string, SchemaBundle>
   onAdd: (id: string) => void
   onRemove: (id: string) => void
 }) {
@@ -2007,7 +2261,13 @@ function CompositionChips(props: {
               {candidates.length === 0 && <p className="drawer-empty">No matching definitions.</p>}
               {candidates.map((id) => {
                 const already = compose.includes(id)
-                const cycle = wouldCreateCycle(props.bundle, props.definitionId, id, props.builtin)
+                const cycle = wouldCreateCycle(
+                  props.bundle,
+                  props.definitionId,
+                  id,
+                  props.builtin,
+                  props.imports,
+                )
                 const disabled = already || cycle
                 return (
                   <button
@@ -2025,6 +2285,79 @@ function CompositionChips(props: {
                   </button>
                 )
               })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ImportPicker(props: {
+  candidates: SchemaPackageFile[]
+  onAdd: (namespace: string, version: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const close = () => { setOpen(false); setQuery('') }
+  const candidates = props.candidates.filter((item) => {
+    if (!query.trim()) return true
+    const needle = query.trim().toLowerCase()
+    return (
+      item.bundle.namespace.toLowerCase().includes(needle) ||
+      item.bundle.id.toLowerCase().includes(needle) ||
+      item.path.toLowerCase().includes(needle)
+    )
+  })
+
+  return (
+    <div className="import-picker">
+      <button type="button" className="nav-add" onClick={() => setOpen(true)}>
+        <span aria-hidden="true">+</span> Import schema
+      </button>
+      {open && (
+        <div className="popover-backdrop" onClick={close}>
+          <div className="popover" onClick={(event) => event.stopPropagation()}>
+            <header className="popover-header">
+              <div>
+                <p className="eyebrow">Imports</p>
+                <h3>Add a schema package</h3>
+              </div>
+              <button type="button" className="icon-button" onClick={close}>×</button>
+            </header>
+            <input
+              autoFocus
+              className="text-input"
+              placeholder="Search schema packages"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <div className="picker-list">
+              {candidates.length === 0 && (
+                <p className="drawer-empty">
+                  No other schema bundles were found in this workspace. Add one under
+                  <code> schemas/</code> or map it in <code>project.json</code>.
+                </p>
+              )}
+              {candidates.map((item) => (
+                <button
+                  key={item.path}
+                  type="button"
+                  className="picker-row"
+                  onClick={() => {
+                    props.onAdd(item.bundle.namespace, item.bundle.version)
+                    close()
+                  }}
+                  title={item.path}
+                >
+                  <span className="picker-name">
+                    {packageVersion(item.bundle.namespace, item.bundle)}
+                  </span>
+                  <span className="picker-meta">
+                    {Object.keys(item.bundle.definitions).length} defs · {item.path}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         </div>

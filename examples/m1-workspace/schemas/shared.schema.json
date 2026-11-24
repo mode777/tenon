@@ -1,0 +1,19 @@
+{
+  "id": "com.example.shared",
+  "version": "1.0.0",
+  "namespace": "shared",
+  "enums": {
+    "Tone": {
+      "values": ["warm", "cool"]
+    }
+  },
+  "definitions": {
+    "shared:tintable": {
+      "abstract": true,
+      "fields": {
+        "tint": { "type": "color", "default": [1, 1, 1] },
+        "tone": { "type": "enum", "enum": "Tone", "default": "warm" }
+      }
+    }
+  }
+}

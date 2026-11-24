@@ -18,6 +18,7 @@ interface FieldEditorProps {
   override: boolean
   canEdit: boolean
   enums: Record<string, SchemaEnum>
+  enumKey?: string
   issues: ValidationIssue[]
   onChange: (patch: Partial<SchemaField>) => void
   onChangeType: (type: string) => void
@@ -38,7 +39,8 @@ export function FieldEditor(props: FieldEditorProps) {
   const { name, field, origin, inherited, override, canEdit, enums, issues } = props
   const isDeferred = DEFERRED_FIELD_TYPES.includes(field.type as (typeof DEFERRED_FIELD_TYPES)[number])
   const isKnown = ALL_TYPE_OPTIONS.includes(field.type as (typeof ALL_TYPE_OPTIONS)[number])
-  const enumValues = field.enum ? enums[field.enum]?.values ?? [] : []
+  const enumKey = props.enumKey ?? field.enum ?? ''
+  const enumValues = enumKey ? enums[enumKey]?.values ?? [] : []
 
   return (
     <div className="inspector-body">
@@ -108,7 +110,7 @@ export function FieldEditor(props: FieldEditorProps) {
           Enum
           <select
             className="select-input"
-            value={field.enum ?? ''}
+            value={enumKey}
             disabled={!canEdit || inherited}
             onChange={(event) => props.onChange({ enum: event.target.value })}
           >
@@ -117,7 +119,7 @@ export function FieldEditor(props: FieldEditorProps) {
               <option key={enumName} value={enumName}>{enumName}</option>
             ))}
           </select>
-          {field.enum && enumValues.length === 0 && (
+          {enumKey && enumValues.length === 0 && (
             <span className="field-error">This enum has no values yet.</span>
           )}
         </label>
@@ -128,6 +130,7 @@ export function FieldEditor(props: FieldEditorProps) {
         <ValueEditor
           field={field}
           enums={enums}
+          enumKey={enumKey}
           disabled={!canEdit}
           onChange={(value) => props.onChange({ default: value })}
           onClear={props.onClearDefault}
