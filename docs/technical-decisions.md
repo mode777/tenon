@@ -778,13 +778,14 @@ The plugin also contributes one project-level panel, two scene panels, and two c
   activation, so the panel may call `requestNewFile` even without owning DOM focus. The
   panel then calls `openFile`. The panel's New Schema and New Scene buttons use the same
   request path.
-- This requires Exo 0.8.0 or newer for command-scoped user activation. The manifest
-  declares that minimum range; the command still obeys permission, write, size,
+- This requires Exo 0.8.0 or newer for command-scoped user activation; the current
+  manifest's 0.11.0 floor also covers it. The command still obeys permission, write, size,
   rate, and shell-dialog checks.
 - The scene inspector and inspection panels require Exo 0.10.0 or newer for the bottom
-  panel location, `activeEditor`/`editor/active`, and SDK 1.10.0. The manifest declares
-  `>=0.10.0`, so an older shell fails closed with `incompatible-engine` before parsing
-  the bottom location.
+  panel location, `activeEditor`/`editor/active`, and SDK 1.10.0. Because the scene and
+  level editors bind the panels as automatic companions, the manifest declares `>=0.11.0`;
+  an older shell fails closed with `incompatible-engine` before parsing the bottom location
+  or the companion fields.
 - Builtin `basic3d` bundles are packaged with the plugin, not written into the
   workspace (TD-25). The schema editor exposes them read-only; the engine ships
   the same versions.
@@ -972,4 +973,5 @@ bottom Inspection panel are Exo shell panels, not iframes inside the scene edito
   state when no Tenon scene/level editor is active, including when the active editor is a
   project or schema editor.
 - A panel never writes a workspace file. A panel edit is a command to the active editor,
-  which remains the only writer. This requires Exo 0.10.0+ and SDK 1.10.0.
+  which remains the only writer. The panel protocol requires Exo 0.10.0+ and SDK 1.10.0;
+  automatic companion binding requires Exo 0.11.0+, which the manifest declares.

@@ -1,7 +1,7 @@
 # M2 demo workspace
 
 A complete Tenon M2 project: schemas, a reusable train scene, a level that instances
-it, and a GLB mesh asset. Requires Exo shell **0.10.0+** for the scene panels.
+it, and a GLB mesh asset. Requires Exo shell **0.11.0+** for the scene companion panels; the panels use active-editor context introduced in Exo 0.10.0.
 
 ```text
 m2-workspace/

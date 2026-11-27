@@ -80,8 +80,11 @@ runtime and build tooling stay outside the plugin.
   fallback rather than an assumption: manual path entry, read-only browsing, or
   initial-theme-only. (`../docs/technical-decisions.md` TD-26)
 - **Doc drift risk.** Core rules are repeated across `AGENTS.md`, `README.md`, and the design
-  docs; changes must update every copy. Known current mismatches are recorded in
-  [Tech stack](../tech-stack.md#known-inconsistencies).
+  docs; changes must update every copy. No mismatches are known at baseline.
+- **Browser support.** Tenon inherits the Exo shell's browser matrix; desktop Chromium is the
+  supported plugin-host target, Firefox and Safari plugin-host support are unverified, and
+  mobile is out of scope. The scene viewport adds a WebGL requirement. See
+  [Tech stack](../tech-stack.md#browser-support).
 
 ## Decisions
 

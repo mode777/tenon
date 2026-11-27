@@ -19,8 +19,9 @@ one scene or level document at a time and adds the 3D viewport.
 ## Scene editor (`scenes/*.scene.json`, `levels/*.scene.json`)
 
 A level is a scene document under `levels/`; it opens in the same editor with a level
-badge and top-level-world behavior. The scene panels require **Exo 0.10.0+** and the
-Tenon SDK 1.10.0 contract.
+badge and top-level-world behavior. The scene panels require **Exo 0.11.0+** and the
+Tenon SDK 1.10.0 contract. The panels use the active-editor context and bottom location
+introduced in Exo 0.10.0; automatic companion binding arrived in Exo 0.11.0.
 
 ### Layout
 

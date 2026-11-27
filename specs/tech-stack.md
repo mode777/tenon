@@ -23,8 +23,20 @@
 - **Test one:** from `plugin/`, `npx vitest run <test-file>`
 - **Typecheck:** `npm run typecheck` — `tsc --noEmit`
 - **Build:** `npm run build` — typecheck then Vite production build in `plugin/dist`
-- **Lint:** no lint script is configured (`TBD` if one is added)
+- **Lint:** no lint or formatter script. The static gate is `npm run typecheck`; tests and
+  build complete the ship gate.
 - **Deploy:** push to `main`; CI runs tests and build, then deploys Pages.
+
+## Browser support
+
+Tenon is a plugin inside Exo and inherits the Exo shell's browser matrix; it has no separate
+browser-verification matrix. As of the Exo v1 matrix, desktop Chromium (Chrome/Edge) is the
+supported plugin-host target, Firefox plugin-host support is unverified, Safari is unverified,
+and mobile is out of scope. The scene editor additionally requires WebGL for three.js. Do not
+claim a browser combination that the Exo host does not support.
+
+Evidence: Exo shell `docs/browser-support.md`
+(<https://github.com/mode777/exo-editor/blob/main/docs/browser-support.md>).
 
 ## Conventions
 
@@ -58,14 +70,6 @@
 - **Never:** hand-write `postMessage` frames; write `exo.json` or `.exo/**`; write a workspace
   file other than the open document through the shell save handler; commit secrets,
   `node_modules/`, or generated build output.
-
-## Known inconsistencies
-
-- `README.md`, `examples/m2-workspace/README.md`, `docs/scene-editor-ui.md`, and the
-  roadmap say the scene panels require Exo 0.10.0+. The manifest requires `>=0.11.0`
-  because the scene/level editors bind `companionPanels`, which arrived in Exo 0.11.0.
-  The manifest is authoritative for install compatibility; the docs are stale.
-- Browser support is not documented. `TBD`.
 
 ## Evidence
 
