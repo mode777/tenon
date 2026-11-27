@@ -8,7 +8,7 @@
     "name": "Tenon"
   },
   "engines": {
-    "exo": ">=0.10.0"
+    "exo": ">=0.11.0"
   },
   "runtime": {
     "entry": "plugin.html"
@@ -40,14 +40,16 @@
         "entry": "editors/scene.html",
         "label": "Tenon Scene",
         "priority": 30,
-        "rendering": "frame"
+        "rendering": "frame",
+        "companionPanels": ["tenon.scene.inspector", "tenon.scene.inspection"]
       },
       {
         "glob": "levels/*.scene.json",
         "entry": "editors/scene.html",
         "label": "Tenon Level",
         "priority": 30,
-        "rendering": "frame"
+        "rendering": "frame",
+        "companionPanels": ["tenon.scene.inspector", "tenon.scene.inspection"]
       }
     ],
     "panels": [
