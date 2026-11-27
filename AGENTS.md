@@ -112,10 +112,10 @@ scripts, generator editor) are still planned; do not create them just to "verify
   never reads, writes, or lists them.
 - Format editors are per format, never per definition. Adding a definition changes
   schema data and adds no page, glob, or editor code.
-- The project hub panel (`tenon.project`) is the only shell panel. It is
-  project-level, hosts the New Schema and New Scene actions, and is the target of the
-  `tenon.new-schema` and `tenon.new-scene` commands. Per-document tools stay in editor
-  frames.
+- The project hub panel (`tenon.project`) is the only project-level shell panel. It hosts
+  the New Schema and New Scene actions and is the target of the `tenon.new-schema` and
+  `tenon.new-scene` commands. Per-document tools stay in editor frames; the scene
+  Inspector and Inspection panels are document-scoped.
 - New Schema and New Scene require Exo 0.8.0+ command-scoped user activation; the panel
   may call `requestNewFile` during its live command invocation without owning DOM focus.
 - The schema and project editors are DOM-only frames. The scene editor is M2 and adds
@@ -124,3 +124,22 @@ scripts, generator editor) are still planned; do not create them just to "verify
   validation. Frames do not share mutable state.
 - The plugin writes only the open document through the shell save handler; new files
   come from user-invoked shell actions, and build and playtest run outside the plugin.
+
+## Nanospec docs
+
+Read [Project](specs/project.md), [Tech stack](specs/tech-stack.md), and
+[Memory](specs/memory.md) first; read other specs only when relevant. Baseline specs are
+updated only through `nsx-init`, `nsx-explore`, and `nsx-sync`; `nsx-retro` may update
+`memory.md` only.
+
+- [Project](specs/project.md)
+- [Tech stack](specs/tech-stack.md)
+- [Memory](specs/memory.md)
+- [Requirements](specs/requirements/)
+- [System architecture](specs/architecture/system.md)
+- [Module architecture](specs/architecture/)
+- [Active changes](changes/)
+- [Archived changes](changes/archive/)
+
+This file takes precedence over nanospec skill rules. In particular, the repository's commit,
+push, and deployment workflow in this file governs when a nanospec skill says otherwise.

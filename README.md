@@ -42,10 +42,12 @@ Point a workspace's `exo.json` at `http://localhost:5175/exo-manifest.json` whil
 - [Technical decisions](docs/technical-decisions.md) — the data model, formats, pipeline, editor stack, and Exo plugin boundary.
 - [Roadmap](docs/roadmap.md) — MVP-driven milestones with demos and acceptance criteria.
 - [basic3d schema reference](docs/basic3d.schema.json) — the builtin core schema shipped with the Tenon plugin and engine.
+- [Baseline specs](specs/project.md) — current project scope, requirements, stack, and architecture.
 
-## Agent skill
+## Agent skills
 
 - [Create Exo plugin](.agents/skills/create-exo-plugin/SKILL.md) — vendored skill for building, testing, and hosting the editor plugin.
+- [Nanospec](.agents/skills/nanospec/README.md) — repo-local baseline specs and change workflow.
 
 ## Status
 
@@ -57,8 +59,10 @@ M1 and M2 are implemented. The plugin ships a project hub, New Schema and New Sc
 tenon/
 ├─ .agents/
 │  └─ skills/
-│     └─ create-exo-plugin/
-│        └─ SKILL.md
+│     ├─ create-exo-plugin/
+│     │  └─ SKILL.md
+│     └─ nanospec/           # baseline/change workflow metadata
+│        └─ README.md
 ├─ .github/
 │  └─ workflows/
 │     └─ deploy.yml
@@ -88,6 +92,15 @@ tenon/
 │     ├─ project.html
 │     ├─ inspector.html
 │     └─ inspection.html
+├─ specs/                    # current baseline (nanospec)
+│  ├─ project.md
+│  ├─ tech-stack.md
+│  ├─ memory.md
+│  ├─ requirements/
+│  └─ architecture/
+├─ changes/                  # active and archived change plans
+│  ├─ README.md
+│  └─ archive/
 └─ docs/
    ├─ editor-concept.md
    ├─ schema-editor-ui.md
