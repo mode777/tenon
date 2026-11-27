@@ -23,14 +23,17 @@ the shell. The shell is the only writer; Tenon supplies format editors and valid
   Evidence: `plugin/public/exo-manifest.json`.
 
 - `HOST-PANELS` — Shell panels follow the active editor.
-  The plugin shall contribute `tenon.project` as a primary panel, `tenon.scene.inspector` as
-  a secondary panel, and `tenon.scene.inspection` as a bottom panel; scene and level editors
-  shall bind the scene panels as companions.
+  The plugin shall contribute `tenon.project` as a primary panel, `tenon.scene.hierarchy` as
+  a primary panel, `tenon.scene.inspector` as a secondary panel, and
+  `tenon.scene.inspection` as a bottom panel; scene and level editors shall bind all three
+  scene panels as companions.
   Why: the project hub is project-level; scene panels are document-scoped and should not
   consume viewport space.
-  Fit: the hub appears in the activity bar; the Inspector/Inspection follow the active
-  scene/level editor and show an empty state otherwise.
-  Evidence: `plugin/public/exo-manifest.json`, `plugin/src/controller.ts`, TD-31.
+  Fit: the hub and Hierarchy & Assets appear in the activity bar; the scene panels follow the
+  active scene/level editor and show an empty state otherwise. The primary sidebar shows one
+  view at a time.
+  Evidence: `plugin/public/exo-manifest.json`, `plugin/src/controller.ts`,
+  `plugin/src/manifest.test.ts`, TD-31.
 
 - `HOST-SHELL-OWNERSHIP` — The shell owns the document lifecycle.
   The plugin shall leave workspace selection, tabs, dirty state, save execution, consent, and

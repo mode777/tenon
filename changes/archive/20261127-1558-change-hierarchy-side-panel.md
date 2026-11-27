@@ -1,6 +1,6 @@
 # Change: hierarchy-side-panel
 
-Status: done
+Status: synced
 Created: 2026-11-27
 
 ## 1. Proposal

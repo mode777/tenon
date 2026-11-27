@@ -18,7 +18,7 @@
 
 - **Install:** `npm install`
 - **Dev server:** `npm run dev` — Vite on `http://localhost:5175`
-- **Test all:** `npm test` — runs the plugin Vitest suite (13 files, 110 tests at the time
+- **Test all:** `npm test` — runs the plugin Vitest suite (16 files, 117 tests at the time
   of this baseline)
 - **Test one:** from `plugin/`, `npx vitest run <test-file>`
 - **Typecheck:** `npm run typecheck` — `tsc --noEmit`

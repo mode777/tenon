@@ -1,8 +1,8 @@
 # Feature: Scene and level authoring
 
 The scene editor authors one scene or level document at a time. It adds the three.js viewport
-and writes document edits through the shell; the Inspector and Inspection panels follow the
-active scene/level editor.
+and writes document edits through the shell; the Hierarchy & Assets, Inspector, and Inspection
+panels follow the active scene/level editor.
 
 ## Requirements
 
@@ -20,7 +20,7 @@ active scene/level editor.
   Why: these are the core scene-authoring operations.
   Fit: each operation changes the scene document through the editor's history.
   Evidence: `plugin/src/scene/SceneEditor.tsx`, `plugin/src/scene/scene-commands.ts`,
-  `docs/scene-editor-ui.md`.
+  `plugin/src/scene/panels/HierarchyPanel.tsx`, `docs/scene-editor-ui.md`.
 
 - `SCENE-TRANSFORMS` — Every entity has a transform.
   Every scene entity shall have a built-in local transform outside `props`; omitted
@@ -39,7 +39,7 @@ active scene/level editor.
   boundary.
   Fit: a level lists the train instance as one node; the attached button appears beneath it;
   internal train entities do not.
-  Evidence: `plugin/src/scene/SceneEditor.tsx`, `docs/scene-editor-ui.md`.
+  Evidence: `plugin/src/scene/panels/HierarchyPanel.tsx`, `docs/scene-editor-ui.md`.
 
 - `SCENE-LIBRARY` — Browse entities, scenes, and assets.
   The scene library shall show concrete definitions only, other scene documents that can be
@@ -48,8 +48,8 @@ active scene/level editor.
   JSON.
   Fit: abstract definitions never appear; placing a definition from another namespace adds
   its exact requirement; refresh picks up external files.
-  Evidence: `plugin/src/scene/SceneEditor.tsx`, `plugin/src/scene/scene-workspace.ts`,
-  `docs/scene-editor-ui.md`.
+  Evidence: `plugin/src/scene/panels/HierarchyPanel.tsx`,
+  `plugin/src/scene/scene-workspace.ts`, `docs/scene-editor-ui.md`.
 
 - `SCENE-ASSETS` — Place mesh assets.
   Files under `assets/` shall be assets, not entities; a `.glb` shall be placeable as a
@@ -58,8 +58,8 @@ active scene/level editor.
   Why: imported meshes are source assets; placing one creates an entity instance.
   Fit: a GLB in `assets/` can be selected and placed; the resulting entity references the
   asset path.
-  Evidence: `plugin/src/scene/SceneEditor.tsx`, `plugin/src/core/scene.ts` (`resolveScenePath`),
-  TD-21.
+  Evidence: `plugin/src/scene/panels/HierarchyPanel.tsx`,
+  `plugin/src/scene/scene-commands.ts`, `plugin/src/core/scene.ts` (`resolveScenePath`), TD-21.
 
 - `SCENE-PANELS` — Panels follow the active scene editor.
   The scene Inspector and Inspection panels shall follow the active Tenon scene/level editor,
@@ -70,6 +70,52 @@ active scene/level editor.
   Fit: switching scene tabs updates both panels; no scene open shows an empty state.
   Evidence: `plugin/src/scene/useScenePanelBridge.ts`,
   `plugin/src/scene/panels/useScenePanel.ts`, TD-31.
+
+- `SCENE-HIERARCHY-PANEL` — Hierarchy and library live in a shell panel.
+  The scene/level workspace shall expose the host hierarchy and entity/scene/asset library in
+  the singleton `tenon.scene.hierarchy` primary shell panel, auto-revealed as a companion of
+  the active scene/level editor and following the active editor instance.
+  Why: the primary sidebar is shell-owned and keeps the viewport uncluttered.
+  Fit: opening a scene/level reveals the panel; switching to a project/schema editor hides it;
+  switching scene tabs updates it; opening it with no scene shows an empty state.
+  Evidence: `plugin/public/exo-manifest.json`,
+  `plugin/src/scene/panels/HierarchyPanel.tsx`,
+  `plugin/src/scene/panels/panel-roots.tsx`, TD-31.
+
+- `SCENE-PANEL-COMMANDS` — Panel edits are editor commands.
+  The hierarchy panel shall send typed commands for selection and for adding entities, scene
+  instances, and assets to the active scene/level editor; the editor shall apply them through
+  its existing reducer and history and remain the only writer.
+  Why: the shell panel must not write workspace files or own document state.
+  Fit: adding from the panel marks the document dirty, selects the new entity, and is undoable;
+  a read-only workspace disables placement.
+  Evidence: `plugin/src/scene/scene-commands.ts`,
+  `plugin/src/scene/panels/HierarchyPanel.tsx`,
+  `plugin/src/scene/useScenePanelBridge.ts`.
+
+- `SCENE-PANEL-SHORTCUTS` — Keyboard behavior survives the move.
+  While the hierarchy panel has focus, Delete/Backspace, Ctrl/Cmd+D, Escape, Ctrl/Cmd+Z,
+  Shift+Ctrl/Cmd+Z/Ctrl+Y, Ctrl/Cmd+S, and W/E/R shall perform the same actions as when the
+  scene frame has focus, except while a text input, select, or contenteditable element has
+  focus.
+  Why: moving the pane out of the editor frame would otherwise regress the current shortcut
+  behavior.
+  Fit: panel-focused shortcuts edit/undo/save/switch mode through the active editor and do not
+  fire while searching or typing.
+  Evidence: `plugin/src/scene/panels/HierarchyPanel.tsx`,
+  `plugin/src/scene/useScenePanelBridge.ts`,
+  `plugin/src/scene/panels/HierarchyPanel.test.tsx`.
+
+- `SCENE-PANEL-REFRESH` — One refresh updates both views.
+  When the user refreshes the hierarchy panel, the panel shall reload its workspace view and
+  the active editor shall reload its schema/asset context so validation and placement use the
+  same workspace state.
+  Why: panel and editor must not drift after an external schema/asset change.
+  Fit: adding a schema or asset outside the editor and refreshing updates the palette, asset
+  list, and scene validation without reopening the document.
+  Evidence: `plugin/src/scene/panels/panel-roots.tsx`,
+  `plugin/src/scene/useScenePanelBridge.ts`,
+  `plugin/src/scene/panels/HierarchyPanelRoot.test.tsx`.
 
 - `SCENE-INSPECTOR` — Schema-generated entity inspector.
   The Inspector shall show schema-generated fields and the built-in transform for the selected
@@ -101,8 +147,10 @@ active scene/level editor.
   history with another frame.
   Why: placement and composition edits are exploratory; per-document history prevents
   cross-tab surprises.
-  Fit: undo reverses a transform or placement in the active document only.
-  Evidence: `plugin/src/core/history.ts`, `plugin/src/scene/SceneEditor.tsx`, `AGENTS.md`.
+  Fit: undo reverses a transform or placement in the active document only, including edits
+  issued from a scene panel.
+  Evidence: `plugin/src/core/history.ts`, `plugin/src/scene/SceneEditor.tsx`,
+  `plugin/src/scene/useScenePanelBridge.ts`, `AGENTS.md`.
 
 - `SCENE-DEBUG-EXPANSION` — Preview the resolved world without saving it.
   The Inspection panel's debug expansion shall resolve scene instances, promotions, and slot
@@ -117,6 +165,7 @@ active scene/level editor.
 ## Sources
 
 - `plugin/src/scene/`
+- `plugin/src/scene/panels/`
 - `plugin/src/core/scene.ts`
 - `plugin/src/core/history.ts`
 - `docs/scene-editor-ui.md`

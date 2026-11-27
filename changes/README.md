@@ -8,4 +8,4 @@ Completed single changes and fully synced staged features move to
 [archive/](archive/). Use the `nsx-change`, `nsx-multi`, or `nsx-bugfix` skill to create one;
 use `nsx-apply` to implement and `nsx-sync` to merge the approved deltas into `specs/`.
 
-Active: [change-hierarchy-side-panel.md](change-hierarchy-side-panel.md) — done, awaiting sync.
+No active changes.

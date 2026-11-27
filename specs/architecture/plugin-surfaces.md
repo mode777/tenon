@@ -11,19 +11,21 @@ Purpose: the Exo-facing registration, format frames, shell panels, and scene pan
   save conflicts, external changes, read-only workspaces, and theme changes.
 - Host the project hub panel, which lists project documents and invokes the shell file
   creation dialog for New Schema and New Scene.
-- Run the scene Inspector and Inspection panels as singleton view frames that follow the
-  active scene/level editor and exchange snapshots/commands over `local/tenon.scene`.
+- Run the scene Hierarchy & Assets, Inspector, and Inspection panels as singleton view frames
+  that follow the active scene/level editor and exchange snapshots, commands, and intents
+  over `local/tenon.scene`.
 - Degrade explicitly when an optional shell capability is absent.
 
 ## Interface
 
 - **Manifest contributions:** `project.json`, `schemas/*.schema.json`,
   `scenes/*.scene.json`, and `levels/*.scene.json` file editors; `tenon.project` primary
-  panel; `tenon.scene.inspector` secondary panel; `tenon.scene.inspection` bottom panel;
-  `tenon.new-schema` and `tenon.new-scene` commands. (`plugin/public/exo-manifest.json`)
+  panel; `tenon.scene.hierarchy` primary panel; `tenon.scene.inspector` secondary panel;
+  `tenon.scene.inspection` bottom panel; `tenon.new-schema` and `tenon.new-scene` commands.
+  (`plugin/public/exo-manifest.json`)
 - **Controller:** `registration.register(...)`, `registerPanel(...)`, `registerCommand(...)`,
-  then `complete()`. Scene panels register conditionally when the shell supports the bottom
-  panel. (`plugin/src/controller.ts`)
+  then `complete()`. The inspection panel registers conditionally when the shell supports the
+  bottom panel. (`plugin/src/controller.ts`)
 - **Editor frame:** `connectBrowserPlugin()` in editor mode; `readFile`, `setDirty`,
   `onSaveRequest`, `onSaveResult`, `onFileChanged`, `onDispose`, `requestSave`,
   `followTheme`. (`plugin/src/*/main.tsx`, `plugin/src/*Editor.tsx`)
@@ -31,8 +33,9 @@ Purpose: the Exo-facing registration, format frames, shell panels, and scene pan
   `editor/active`, `subscribeLocal`/`publishLocal`, `readFile`/`listDirectory`,
   `requestPanel`. (`plugin/src/scene/panels/`)
 - **Scene bridge:** `ScenePanelSnapshot` carries `revision`, `path`, `doc`, `selection`,
-  `canWrite`, and `levelMode`. `SceneCommand` carries typed document edits. Messages are
-  validated and targeted by editor instance ID. (`plugin/src/scene/scene-panel-protocol.ts`)
+  `canWrite`, and `levelMode`. `SceneCommand` carries typed document edits; `SceneEditorIntent`
+  carries undo/redo/save/set-mode/refresh actions. Messages are validated and targeted by
+  editor instance ID. (`plugin/src/scene/scene-panel-protocol.ts`)
 
 ## Relevant details
 
@@ -46,13 +49,16 @@ Purpose: the Exo-facing registration, format frames, shell panels, and scene pan
   dirty. The frame never receives a file handle. (`plugin/src/*Editor.tsx`, TD-26)
 - **New files.** The project hub calls `requestNewFile` during a live command invocation,
   then `openFile`. The shell owns the dialog, path, and write. (`plugin/src/project/main.tsx`)
-- **Panel lifecycle.** Scene panels are singleton view frames. The shell reveals them when
-  the scene/level editor is active and hides them when another surface is active; the shell
-  owns companion visibility. (`plugin/public/exo-manifest.json`, TD-31)
+- **Panel lifecycle.** Scene panels are singleton view frames. The scene/level editor binds
+  the primary Hierarchy & Assets, secondary Inspector, and bottom Inspection panels as
+  companions; the shell reveals/hides them as the active surface changes and owns companion
+  visibility. The primary sidebar shows one view at a time. (`plugin/public/exo-manifest.json`,
+  TD-31)
 - **Panel bridge.** The editor publishes serialized snapshots and `editor-online`; panels
-  request snapshots by editor instance ID and send commands with request IDs. The editor
-  applies commands through the same reducer as its own controls, so undo, dirty state,
-  conflict handling, and Save stay in the editor. (`plugin/src/scene/useScenePanelBridge.ts`,
+  request snapshots by editor instance ID and send commands/intents with request IDs. The
+  editor applies document commands through the same reducer as its own controls and handles
+  intents for undo/redo/save/mode/refresh, so undo, dirty state, conflict handling, and Save
+  stay in the editor. (`plugin/src/scene/useScenePanelBridge.ts`,
   `plugin/src/scene/panels/useScenePanel.ts`)
 - **At-most-once local events.** Panels request a fresh snapshot on mount and when the active
   editor changes; they never assume every intermediate snapshot arrived. A panel shows an
@@ -62,7 +68,9 @@ Purpose: the Exo-facing registration, format frames, shell panels, and scene pan
   Schema/Scene; missing theme events leaves the initial theme applied. (`plugin/src/`,
   TD-26)
 - **Project hub scope.** The hub is the only project-level shell panel. Scene panels are
-  document-scoped and follow the active scene/level editor. (`../AGENTS.md`, TD-31)
+  document-scoped and follow the active scene/level editor. Hierarchy & Assets is a primary
+  scene panel, so it shares the primary sidebar with the project hub and cannot be visible at
+  the same time. (`../AGENTS.md`, TD-31)
 
 ## Dependencies
 
@@ -76,6 +84,7 @@ Purpose: the Exo-facing registration, format frames, shell panels, and scene pan
 |---|---|---|
 | One plugin with per-format frame editors | One consent, shared schema/validation, format-specific UI | TD-26, TD-27 |
 | Shell owns workspace, save, dirty, consent, and theme | Keeps the plugin untrusted and avoids duplicate chrome | TD-26 |
-| Scene Inspector/Inspection are shell panels, not frame iframes | Frees viewport space and lets panels follow the active editor | TD-31 |
-| Panel edits are commands to the editor | The editor remains the only writer and owns undo/conflict state | TD-31 |
-| Primary panel for the project hub; secondary/bottom for scene panels | Matches project-level vs document-level scope and Exo panel locations | TD-26, TD-31 |
+| Scene Hierarchy & Assets/Inspector/Inspection are shell panels, not frame iframes | Frees viewport space and lets panels follow the active editor | TD-31 |
+| Panel edits are commands/intents to the editor | The editor remains the only writer and owns undo/conflict/save state | TD-31 |
+| Primary panel for the project hub; primary/secondary/bottom for scene panels | Matches project-level vs document-level scope and Exo panel locations; the primary sidebar shows one view | TD-26, TD-31 |
+| Hierarchy & Assets and the library share one primary panel | The primary sidebar cannot show two views at once; the tree and library belong together | TD-31 |

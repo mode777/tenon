@@ -71,9 +71,9 @@
 
 M1 and M2 are implemented. The plugin ships the project hub, New Schema and New Scene
 commands, the schema editor, the project import-map editor with project-wide validation, and
-the scene/level editor with the three.js viewport, shell Inspector/Inspection panels, entity
-and scene palettes, asset placement, scene instances, promotions, slots, attachments,
-undo/redo, and save/conflict handling.
+the scene/level editor with the three.js viewport, shell Hierarchy & Assets/Inspector/
+Inspection panels, entity and scene palettes, asset placement, scene instances, promotions,
+slots, attachments, undo/redo, and save/conflict handling.
 
 M3 (events), M4 (generators and bake), M5 (lightmaps), and M6 (1.0 evaluation) remain
 design-only. Do not describe their behavior as current.

@@ -43,8 +43,8 @@ runtime and build tooling stay outside the plugin.
 | Project hub | List schemas/scenes/levels; New Schema and New Scene actions; open project settings | SDK view client, core templates | `plugin/src/project/` |
 | Project editor | Edit `project.json` import map; project-wide schema/scene validation; build readiness | Core project/schema/scene | `plugin/src/project-editor/` |
 | Schema editor | Author one schema bundle: identity, imports, definitions, composition, fields, enums, events, effective view, validation | Core schema | `plugin/src/schema/` |
-| Scene/level editor | Author one scene or level: hierarchy, library, three.js viewport, transforms, scene instances, promotions, slots, debug expansion | Core scene, three.js/R3F | `plugin/src/scene/` |
-| Scene panels | Inspector and Inspection shell panels; follow the active scene editor; request snapshots and send typed commands | SDK view client, shared core, local topic | `plugin/src/scene/panels/`, [plugin surfaces](plugin-surfaces.md) |
+| Scene/level editor | Author one scene or level: three.js viewport, transforms, scene instances, promotions, slots, debug expansion | Core scene, three.js/R3F | `plugin/src/scene/` |
+| Scene panels | Hierarchy & Assets (primary), Inspector (secondary), and Inspection (bottom) shell panels; follow the active scene editor; request snapshots, send commands/intents | SDK view client, shared core, local topic | `plugin/src/scene/panels/`, [plugin surfaces](plugin-surfaces.md) |
 | Vendored SDK | Protocol client, handshake, editor/view clients, theme | Upstream `@exo/plugin-sdk` | `sdk/` |
 | Examples | M1 and M2 runnable workspaces and a GLB asset | Plugin release | `examples/` |
 | CI/deploy | Install, test, build, and deploy `plugin/dist` to GitHub Pages | npm, Vite, GitHub Pages | `.github/workflows/deploy.yml` |
@@ -60,8 +60,9 @@ runtime and build tooling stay outside the plugin.
 4. When the shell requests Save, the frame returns only that document's serialized content.
    The shell performs the write and reports the result, including conflicts.
 5. Scene/level editors publish serialized snapshots on `local/tenon.scene` and apply typed
-   panel commands through the same reducer as their own controls. The editor remains the only
-   writer; panels never save or mutate files.
+   panel commands/intents through the same reducer and history as their own controls. The
+   hierarchy panel also forwards focus/keyboard intents and a workspace-refresh intent. The
+   editor remains the only writer; panels never save or mutate files.
 6. Build and playtest run outside the plugin. The project editor reports readiness and the
    planned `tenon build` command but does not write artifacts.
 
@@ -69,10 +70,11 @@ runtime and build tooling stay outside the plugin.
 
 - **Per-document isolation.** Each open document has its own frame, buffer, selection,
   undo/redo, and validation. No mutable state is shared between frames.
-- **Panel consistency.** Panels receive `activeEditor`/`editor/active`, request a fresh
-  snapshot on mount and when the active editor changes, and tolerate at-most-once local
-  events. A panel shows an empty state when no Tenon scene/level editor is active.
-  (`../docs/technical-decisions.md` TD-31)
+- **Panel consistency.** The Hierarchy & Assets, Inspector, and Inspection panels receive
+  `activeEditor`/`editor/active`, request a fresh snapshot on mount and when the active editor
+  changes, and tolerate at-most-once local events. A panel shows an empty state when no Tenon
+  scene/level editor is active. The hierarchy panel is a primary companion; the primary
+  sidebar shows one view at a time. (`../docs/technical-decisions.md` TD-31)
 - **Validation scopes.** Format editors validate the open document; the project editor
   validates the whole project; the external build adds engine registration and artifact
   checks. (`../docs/technical-decisions.md` TD-16)
@@ -97,7 +99,8 @@ runtime and build tooling stay outside the plugin.
 | Scenes are entity trees; scene instances are atomic and attach only through slots | Clear composition boundary and safe reuse | TD-07, TD-08, TD-10 |
 | Every entity has a built-in transform outside `props` | Placement is not schema data; parent transforms compose | TD-20, TD-23 |
 | The plugin is one Exo plugin with per-format frame editors | One consent and shared schema/validation/UI | TD-26, TD-27 |
-| Scene Inspector/Inspection are shell panels with a local snapshot/command bridge | Keeps panels shell-owned and the editor the only writer | TD-31 |
+| Scene Hierarchy & Assets/Inspector/Inspection are shell panels with a local snapshot/command bridge | Keeps panels shell-owned and the editor the only writer | TD-31 |
+| Hierarchy & Assets is a primary scene panel; the project hub remains the only project-level primary panel | Gives the tree/library a shell-owned home without consuming viewport width; one primary view is visible at a time | TD-31 |
 | Validation is live; Save is never refused for validation errors | Prevents data loss during incomplete authoring | TD-16 |
 
 ## Module architecture
