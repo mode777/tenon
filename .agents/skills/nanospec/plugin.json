@@ -1,0 +1,9 @@
+{
+  "name": "nanospec",
+  "description": "Lightweight, spec driven development framework (nsx-* skills) for coding agents.",
+  "version": "1.0.1",
+  "author": {
+    "name": "SHS-CT"
+  },
+  "skills": "skills/"
+}
