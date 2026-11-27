@@ -55,11 +55,21 @@ function BridgeHarness({
   commit,
   setSelection,
   onError,
+  onUndo = vi.fn(),
+  onRedo = vi.fn(),
+  onSave = vi.fn(),
+  onSetMode = vi.fn(),
+  onRefreshWorkspace = vi.fn(),
 }: {
   client: EditorClient
   commit: (doc: ReturnType<typeof levelScene>) => void
   setSelection: (id: string | null) => void
   onError: (message: string) => void
+  onUndo?: () => void
+  onRedo?: () => void
+  onSave?: () => void
+  onSetMode?: (mode: 'translate' | 'rotate' | 'scale') => void
+  onRefreshWorkspace?: () => Promise<void> | void
 }) {
   const doc = levelScene()
   useScenePanelBridge({
@@ -72,6 +82,11 @@ function BridgeHarness({
     context: contextFor(doc),
     commit,
     setSelection,
+    onUndo,
+    onRedo,
+    onSave,
+    onSetMode,
+    onRefreshWorkspace,
     onError,
   })
   return null
@@ -139,6 +154,9 @@ function PanelHarness({ view }: { view: ViewClient }) {
       <span data-testid="error">{panel.error ?? ''}</span>
       <button type="button" onClick={() => panel.sendCommand({ type: 'select', entityId: 'root' })}>
         Select root
+      </button>
+      <button type="button" onClick={() => panel.sendIntent({ type: 'save' })}>
+        Save scene
       </button>
     </div>
   )
@@ -209,6 +227,60 @@ describe('scene panel bridge', () => {
     expect(result).toMatchObject({ kind: 'command-result', ok: false })
   })
 
+  it('applies panel intents through the editor callbacks', async () => {
+    const { client, publishLocal, emitLocal } = fakeEditorClient()
+    const onUndo = vi.fn()
+    const onRedo = vi.fn()
+    const onSave = vi.fn()
+    const onSetMode = vi.fn()
+    const onRefreshWorkspace = vi.fn(async () => undefined)
+    render(
+      <BridgeHarness
+        client={client}
+        commit={vi.fn()}
+        setSelection={vi.fn()}
+        onError={vi.fn()}
+        onUndo={onUndo}
+        onRedo={onRedo}
+        onSave={onSave}
+        onSetMode={onSetMode}
+        onRefreshWorkspace={onRefreshWorkspace}
+      />,
+    )
+    publishLocal.mockClear()
+
+    emitLocal({ kind: 'intent', target: 'editor-1', requestId: 'i1', intent: { type: 'undo' } })
+    emitLocal({ kind: 'intent', target: 'editor-1', requestId: 'i2', intent: { type: 'redo' } })
+    emitLocal({ kind: 'intent', target: 'editor-1', requestId: 'i3', intent: { type: 'save' } })
+    emitLocal({
+      kind: 'intent',
+      target: 'editor-1',
+      requestId: 'i4',
+      intent: { type: 'set-mode', mode: 'rotate' },
+    })
+    emitLocal({
+      kind: 'intent',
+      target: 'editor-1',
+      requestId: 'i5',
+      intent: { type: 'refresh-workspace' },
+    })
+
+    await waitFor(() => expect(onUndo).toHaveBeenCalled())
+    expect(onRedo).toHaveBeenCalled()
+    expect(onSave).toHaveBeenCalled()
+    expect(onSetMode).toHaveBeenCalledWith('rotate')
+    await waitFor(() => expect(onRefreshWorkspace).toHaveBeenCalled())
+
+    const results = publishLocal.mock.calls
+      .map((call) => call[1] as ScenePanelMessage)
+      .filter((message) => message.kind === 'command-result') as Array<{
+      kind: 'command-result'
+      ok: boolean
+    }>
+    expect(results).toHaveLength(5)
+    expect(results.every((message) => message.ok)).toBe(true)
+  })
+
   it('follows the active scene editor and sends commands to that instance', async () => {
     const user = userEvent.setup()
     const { view, publishLocal, emitLocal, emitActive } = fakeViewClient()
@@ -267,6 +339,12 @@ describe('scene panel bridge', () => {
       .map((call) => call[1] as ScenePanelMessage)
       .find((message) => message.kind === 'command')
     expect(command).toMatchObject({ kind: 'command', target: 'editor-2' })
+
+    await user.click(screen.getByRole('button', { name: 'Save scene' }))
+    const intent = publishLocal.mock.calls
+      .map((call) => call[1] as ScenePanelMessage)
+      .find((message) => message.kind === 'intent')
+    expect(intent).toMatchObject({ kind: 'intent', target: 'editor-2', intent: { type: 'save' } })
   })
 
   it('discovers the active scene editor when the panel starts before it', async () => {

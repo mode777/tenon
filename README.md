@@ -10,7 +10,7 @@ The editor is designed as one Exo editor plugin. The plugin contributes a separa
 
 M1 implements the schema editor: a Tenon project hub panel, the **New Schema** command, and a dedicated frame for definitions, composition, fields, enums, events, imports, and validation.
 
-M2 implements the project and scene editors: the `project.json` import map and project-wide validation, the **New Scene** action, and a three.js scene/level editor with entity placement, transforms, shell-hosted Inspector and Inspection panels, scene instances, promotions, slots, and runtime expansion.
+M2 implements the project and scene editors: the `project.json` import map and project-wide validation, the **New Scene** action, and a three.js scene/level editor with entity placement, transforms, shell-hosted Hierarchy & Assets/Inspector/Inspection panels, scene instances, promotions, slots, and runtime expansion.
 
 ## Live editor
 
@@ -52,7 +52,7 @@ Point a workspace's `exo.json` at `http://localhost:5175/exo-manifest.json` whil
 
 ## Status
 
-M1 and M2 are implemented. The plugin ships a project hub, New Schema and New Scene commands, the schema editor, the project import-map editor with project-wide validation, and the scene/level editor with a three.js viewport, hierarchy, shell-hosted Inspector and Inspection panels, entity and scene palettes, asset browser, scene instances, direct-child field promotions, slots, attachments, undo/redo, and save/conflict handling. The scene panels follow the active editor through Exo's active-editor context and a plugin-local snapshot/command bridge; the manifest requires Exo 0.11.0+ for companion panels. The design docs remain the source of truth for the later events, generators, lightmap, and runtime-build milestones.
+M1 and M2 are implemented. The plugin ships a project hub, New Schema and New Scene commands, the schema editor, the project import-map editor with project-wide validation, and the scene/level editor with a three.js viewport, shell-hosted Hierarchy & Assets/Inspector/Inspection panels, entity and scene palettes, asset browser, scene instances, direct-child field promotions, slots, attachments, undo/redo, and save/conflict handling. The scene panels follow the active editor through Exo's active-editor context and a plugin-local snapshot/command bridge; the manifest requires Exo 0.11.0+ for companion panels. The design docs remain the source of truth for the later events, generators, lightmap, and runtime-build milestones.
 
 ## Repository layout
 
@@ -83,7 +83,7 @@ tenon/
 │  ├─ src/project-editor/  # project.json editor
 │  ├─ src/schema/          # schema editor
 │  ├─ src/scene/           # scene/level editor, viewport, and panel bridge
-│  ├─ src/scene/panels/    # Inspector/Inspection view frames
+│  ├─ src/scene/panels/    # Hierarchy/Inspector/Inspection view frames
 │  ├─ editors/
 │  │  ├─ project.html
 │  │  ├─ schema.html
@@ -91,6 +91,7 @@ tenon/
 │  ├─ plugin.html
 │  └─ views/
 │     ├─ project.html
+│     ├─ hierarchy.html
 │     ├─ inspector.html
 │     └─ inspection.html
 ├─ specs/                    # current baseline (nanospec)

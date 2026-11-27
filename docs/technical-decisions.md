@@ -493,8 +493,8 @@ the 3D stack; the generator editor may reuse it for preview:
 
 Each open document is its own frame. There is no shared mutable store across
 tabs; workspace reads go through the Exo plugin SDK, and saves go through the
-shell's save handler. The scene inspector and inspection panels follow the active
-editor through serialized snapshots and commands (TD-31).
+shell's save handler. The scene hierarchy, inspector, and inspection panels follow the
+active editor through serialized snapshots and commands (TD-31).
 
 Drei provides the viewport baseline: `TransformControls`, `GizmoHelper`, `Grid`, `Outlines`, `Select`, `useCursor`, `Html`, `Line`, and `OrthographicCamera`.
 
@@ -715,11 +715,12 @@ declares these file editors:
 
 The controller is `plugin.html`; every entry stays inside the plugin root.
 
-The plugin also contributes one project-level panel, two scene panels, and two commands:
+The plugin also contributes one project-level panel, three scene panels, and two commands:
 
 | Contribution | Id | Purpose |
 |---|---|---|
 | Panel | `tenon.project` | Project hub: schema/scene list and creation actions |
+| Panel | `tenon.scene.hierarchy` | Document-scoped hierarchy and entity/scene/asset library; primary panel |
 | Panel | `tenon.scene.inspector` | Document-scoped scene/level inspector; secondary panel |
 | Panel | `tenon.scene.inspection` | Document-scoped validation, public surface, and debug expansion; bottom panel |
 | Command | `tenon.new-schema` | **New Schema** in the command palette; targets the project hub |
@@ -732,10 +733,11 @@ The plugin also contributes one project-level panel, two scene panels, and two c
 - A level is a scene document used as the top-level world, so it reuses the scene
   editor and adds level-only controls. There is no separate level format.
 - The controller page registers the declared file editors, the project panel, the scene
-  inspector/inspection panels, and the `tenon.new-schema`/`tenon.new-scene` commands, then
-  is removed. Each open document gets its own handler frame with its own buffer, selection,
-  undo/redo stack, and validation state. Frames do not share mutable state; the scene
-  panels follow the active editor and exchange serialized snapshots and commands (TD-31).
+  hierarchy/inspector/inspection panels, and the `tenon.new-schema`/`tenon.new-scene`
+  commands, then is removed. Each open document gets its own handler frame with its own
+  buffer, selection, undo/redo stack, and validation state. Frames do not share mutable
+  state; the scene panels follow the active editor and exchange serialized snapshots and
+  commands (TD-31).
 - Format editors are per format, never per definition. Adding a concrete
   definition changes schema data only; it adds no page, glob, or editor code.
 - The shell owns the tab strip, breadcrumbs, Save/Save All, dirty indicators,
@@ -743,10 +745,10 @@ The plugin also contributes one project-level panel, two scene panels, and two c
   document surface and must not recreate shell chrome.
 - The project hub is the only project-level shell panel and is a primary panel. It is
   not document-scoped: it lists schema bundles and hosts the New Schema action. It is not
-  a document editor and has no dirty state. The scene inspector and inspection panels are
-  document-scoped shell panels that follow the active scene/level editor (TD-31); the
-  hierarchy and palette stay inside the scene frame, and the schema and project editors
-  keep their own tools in their frames.
+  a document editor and has no dirty state. The scene hierarchy, inspector, and inspection
+  panels are document-scoped shell panels that follow the active scene/level editor
+  (TD-31); the scene frame keeps the viewport, toolbar, and save notices, and the schema
+  and project editors keep their own tools in their frames.
 - All workspace access goes through the plugin SDK. Tenon reads with `readFile`,
   `requestFiles`, and `listDirectory`; it reports dirty with `setDirty`; a
   plugin-originated edit writes only the open document through `onSaveRequest`.
@@ -781,11 +783,11 @@ The plugin also contributes one project-level panel, two scene panels, and two c
 - This requires Exo 0.8.0 or newer for command-scoped user activation; the current
   manifest's 0.11.0 floor also covers it. The command still obeys permission, write, size,
   rate, and shell-dialog checks.
-- The scene inspector and inspection panels require Exo 0.10.0 or newer for the bottom
-  panel location, `activeEditor`/`editor/active`, and SDK 1.10.0. Because the scene and
-  level editors bind the panels as automatic companions, the manifest declares `>=0.11.0`;
-  an older shell fails closed with `incompatible-engine` before parsing the bottom location
-  or the companion fields.
+- The scene hierarchy, inspector, and inspection panels require Exo 0.10.0 or newer for
+  the primary/secondary/bottom locations, `activeEditor`/`editor/active`, and SDK 1.10.0.
+  Because the scene and level editors bind the panels as automatic companions, the
+  manifest declares `>=0.11.0`; an older shell fails closed with `incompatible-engine`
+  before parsing the locations or the companion fields.
 - Builtin `basic3d` bundles are packaged with the plugin, not written into the
   workspace (TD-25). The schema editor exposes them read-only; the engine ships
   the same versions.
@@ -817,7 +819,7 @@ in [schema-editor-ui.md](schema-editor-ui.md).
   (TD-15).
 - At M1, the plugin contributes the `tenon.project` panel and the
   `tenon.new-schema`/`tenon.new-scene` commands (TD-26); M2 adds the scene
-  inspector/inspection panels (TD-31).
+  hierarchy/inspector/inspection panels (TD-31).
 - M1 uses one open schema bundle plus builtin `basic3d` and its declared schema
   imports as the unit of work. The M2 project editor provides import-map editing and
   project-wide resolution, and the scene editor reads the same resolved packages.
@@ -954,11 +956,13 @@ source of truth; the renderer never owns authoring data.
 
 ## TD-31 — Editor-bound scene panels
 
-The scene editor keeps the document in its handler frame. The right Inspector and the
-bottom Inspection panel are Exo shell panels, not iframes inside the scene editor.
+The scene editor keeps the document in its handler frame. The left hierarchy/library,
+the right Inspector, and the bottom Inspection panel are Exo shell panels, not iframes
+inside the scene editor.
 
-- `tenon.scene.inspector` is a secondary panel; `tenon.scene.inspection` is a bottom
-  panel. Both are singleton plugin views that follow the active Tenon scene/level editor.
+- `tenon.scene.hierarchy` is a primary panel; `tenon.scene.inspector` is a secondary
+  panel; `tenon.scene.inspection` is a bottom panel. All are singleton plugin views that
+  follow the active Tenon scene/level editor.
 - The panels receive `activeEditor` and `editor/active` from Exo and request a snapshot
   over `local/tenon.scene`. They do not own a document, save path, dirty state, or undo
   stack.
@@ -968,10 +972,12 @@ bottom Inspection panel are Exo shell panels, not iframes inside the scene edito
 - Panels load the workspace read-only for schema, asset, scene, and validation context.
   The editor snapshot is the document source; local events are at-most-once, so a panel
   requests a fresh snapshot on mount and whenever the active editor changes.
-- The scene frame keeps the hierarchy, entity/scene/asset library, viewport, toolbar, and save
-  notices. The project hub remains the only project-level panel. A panel shows an empty
-  state when no Tenon scene/level editor is active, including when the active editor is a
-  project or schema editor.
+- The scene frame keeps the viewport, toolbar, and save notices; the hierarchy and
+  entity/scene/asset library live in the primary hierarchy panel. The project hub remains
+  the only project-level panel. A panel shows an empty state when no Tenon scene/level
+  editor is active, including when the active editor is a project or schema editor. The
+  primary sidebar shows one view at a time, so the hierarchy panel and project hub cannot
+  be visible simultaneously.
 - A panel never writes a workspace file. A panel edit is a command to the active editor,
   which remains the only writer. The panel protocol requires Exo 0.10.0+ and SDK 1.10.0;
   automatic companion binding requires Exo 0.11.0+, which the manifest declares.

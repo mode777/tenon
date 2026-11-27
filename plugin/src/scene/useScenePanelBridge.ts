@@ -4,12 +4,14 @@ import type { SceneDocument, SceneValidationContext } from '../core/scene'
 import { normalizeScenePath } from '../core/scene'
 import { applySceneCommand } from './scene-commands'
 import {
+  HIERARCHY_PANEL_ID,
   INSPECTION_PANEL_ID,
   INSPECTOR_PANEL_ID,
   SCENE_PANEL_TOPIC,
   isScenePanelMessage,
   type InspectionTab,
   type ScenePanelMessage,
+  type SceneTransformMode,
 } from './scene-panel-protocol'
 
 export interface ScenePanelBridgeOptions {
@@ -22,10 +24,16 @@ export interface ScenePanelBridgeOptions {
   context: SceneValidationContext
   commit: (doc: SceneDocument) => void
   setSelection: (id: string | null) => void
+  onUndo: () => void
+  onRedo: () => void
+  onSave: () => void
+  onSetMode: (mode: SceneTransformMode) => void
+  onRefreshWorkspace: () => Promise<void> | void
   onError: (message: string) => void
 }
 
 export interface ScenePanelBridge {
+  revealHierarchy: () => void
   revealInspector: () => void
   revealInspection: (tab?: InspectionTab) => void
 }
@@ -144,6 +152,34 @@ export function useScenePanelBridge(options: ScenePanelBridgeOptions): ScenePane
         if (activeRef.current) publishOnline(true)
         return
       }
+      if (message.kind === 'intent' && message.target === instanceId) {
+        void (async () => {
+          try {
+            const options = optionsRef.current
+            switch (message.intent.type) {
+              case 'undo':
+                options.onUndo()
+                break
+              case 'redo':
+                options.onRedo()
+                break
+              case 'save':
+                options.onSave()
+                break
+              case 'set-mode':
+                options.onSetMode(message.intent.mode)
+                break
+              case 'refresh-workspace':
+                await options.onRefreshWorkspace()
+                break
+            }
+            publishResult(message.requestId, true)
+          } catch (error) {
+            publishResult(message.requestId, false, errorMessage(error))
+          }
+        })()
+        return
+      }
       if (message.kind !== 'command' || message.target !== instanceId) return
       try {
         const state = stateRef.current
@@ -195,6 +231,13 @@ export function useScenePanelBridge(options: ScenePanelBridgeOptions): ScenePane
     options.scenePath,
   ])
 
+  const revealHierarchy = useCallback(() => {
+    const client = optionsRef.current.client
+    if (!client.capabilities.requestPanel) return
+    revealedRef.current = true
+    void client.requestPanel(HIERARCHY_PANEL_ID, 'show').catch(() => undefined)
+  }, [])
+
   const revealInspector = useCallback(() => {
     const client = optionsRef.current.client
     if (!client.capabilities.requestPanel) return
@@ -227,6 +270,7 @@ export function useScenePanelBridge(options: ScenePanelBridgeOptions): ScenePane
     let cancelled = false
     const reveal = async () => {
       const results = await Promise.allSettled([
+        client.requestPanel(HIERARCHY_PANEL_ID, 'show'),
         client.requestPanel(INSPECTOR_PANEL_ID, 'show'),
         client.requestPanel(INSPECTION_PANEL_ID, 'show'),
       ])
@@ -254,5 +298,5 @@ export function useScenePanelBridge(options: ScenePanelBridgeOptions): ScenePane
     }
   }, [instanceId, publishOnline])
 
-  return { revealInspector, revealInspection }
+  return { revealHierarchy, revealInspector, revealInspection }
 }

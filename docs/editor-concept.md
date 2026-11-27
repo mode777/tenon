@@ -219,7 +219,7 @@ The plugin contributes one visible frame editor per authoring format:
 |---|---|---|
 | **Project** | `project.json` | Import map, resolved schema versions, project-wide validation, build readiness |
 | **Schema** | `schemas/*.schema.json` | Definition tree, composition, fields, enums, defaults, events, read-only builtins |
-| **Scene** | `scenes/*.scene.json`, `levels/*.scene.json` | Hierarchy, 3D viewport, entity/scene/asset library, shell Inspector/Inspection panels, promotions, slots |
+| **Scene** | `scenes/*.scene.json`, `levels/*.scene.json` | 3D viewport, shell Hierarchy & Assets/Inspector/Inspection panels, promotions, slots |
 | **Generator** | `generators/*/generator.json` | Parameter form, seed, preview, bake settings |
 
 A level is a scene document used as the top-level world, so it opens in the scene
@@ -233,9 +233,10 @@ actions are available from the Exo command palette. A live command invocation le
 the panel create the file through the shell-owned dialog and open it in its format
 editor. The hub is not a document editor and has no dirty state.
 
-The scene editor also contributes two document-scoped shell panels: a secondary
-Inspector and a bottom Inspection panel. They follow the active scene/level editor and
-exchange snapshots and commands with it; the editor remains the only document owner.
+The scene editor also contributes three document-scoped shell panels: a primary
+Hierarchy & Assets panel, a secondary Inspector, and a bottom Inspection panel. They
+follow the active scene/level editor and exchange snapshots and commands with it; the
+editor remains the only document owner.
 
 The editors are per format, not per definition. Adding a concrete definition is
 a schema edit; it does not add a page, a glob, or editor code. The schema editor is
@@ -244,7 +245,8 @@ M1; the project and scene/level editors are M2, and the generator editor follows
 ### Scene and level editor
 
 - 3D viewport with selection, transform gizmos, grid, and snapping.
-- Scene hierarchy panel.
+- Hierarchy & Assets primary shell panel with the host scene tree and entity/scene/asset
+  library.
 - Schema-generated property Inspector shell panel.
 - Entity palette showing concrete definitions only.
 - Asset browser for meshes in `assets/`.

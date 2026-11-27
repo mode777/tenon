@@ -25,15 +25,17 @@ introduced in Exo 0.10.0; automatic companion binding arrived in Exo 0.11.0.
 
 ### Layout
 
-The scene frame owns the document surface: toolbar, hierarchy, library, viewport,
-and save/conflict notices. The Inspector and Inspection surfaces are Exo shell panels, not
-iframes inside the scene frame.
+The scene frame owns the toolbar, viewport, and save/conflict notices. The Hierarchy &
+Assets, Inspector, and Inspection surfaces are Exo shell panels, not iframes inside the
+scene frame.
 
 - **Toolbar:** move/rotate/scale mode, snapping, undo/redo, duplicate, delete, and
-  Inspector/Inspection actions with the validation count.
+  Hierarchy/Inspector/Inspection actions with the validation count.
+- **Hierarchy & Assets:** the `tenon.scene.hierarchy` primary shell panel. It contains the
+  host scene tree and the entity/scene/asset library.
 - **Hierarchy:** the host scene tree. Scene instance internals are not listed; a scene
   instance is one atomic node. Host attachments appear under their instance.
-- **Library:** three tabs in the lower-left panel.
+- **Library:** three tabs in the lower section of the hierarchy panel.
   - **Entities:** concrete definitions from the available schemas. Placing a definition
     from another namespace adds its exact `namespace@version` requirement to the scene.
     Abstract definitions never appear.
@@ -57,18 +59,23 @@ iframes inside the scene frame.
 
 ### Panel synchronization
 
-- The panels follow the active Tenon scene/level editor through Exo's `activeEditor` and
-  `editor/active`. They do not own a document or a save path.
+- The Hierarchy & Assets, Inspector, and Inspection panels follow the active Tenon
+  scene/level editor through Exo's `activeEditor` and `editor/active`. They do not own a
+  document or a save path.
 - The editor publishes a serialized snapshot on a plugin-local topic; a panel requests a
   fresh snapshot when it mounts or the active editor changes, then sends typed commands
   back to that editor instance.
 - The editor applies panel commands through the same reducer as its own controls, so undo,
   dirty state, conflict handling, and Save stay in the scene frame.
 - A panel shows an empty state when no scene/level editor is active. Opening a project or
-  schema editor does not show a scene inspector for that file.
+  schema editor does not show a scene panel for that file.
 - The panels load the workspace read-only for schema, asset, scene, and validation
   context. Local events are at-most-once; a panel never assumes it has every intermediate
   snapshot.
+- The primary sidebar shows one view at a time, so the Hierarchy & Assets panel and the
+  project hub cannot be visible simultaneously. The scene/level editor declares the
+  hierarchy panel as a primary companion, so the shell reveals it when the scene becomes
+  active and hides it when another surface is active.
 
 ### Editing behavior
 

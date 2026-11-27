@@ -2,6 +2,7 @@ import type { ViewClient } from '@exo/plugin-sdk'
 import { useCallback, useRef, useState } from 'react'
 import { loadWorkspace, type LoadedWorkspace } from '../../core/workspace'
 import { sceneValidationContext, isSceneEditorPath } from '../scene-workspace'
+import { HierarchyPanel } from './HierarchyPanel'
 import { InspectionPanel } from './InspectionPanel'
 import { InspectorPanel } from './InspectorPanel'
 import { useScenePanel } from './useScenePanel'
@@ -64,6 +65,56 @@ function PanelLoading() {
       </div>
       <h2>Waiting for the scene editor</h2>
       <p>The panel is requesting the active scene state.</p>
+    </div>
+  )
+}
+
+export function HierarchyPanelRoot({
+  view,
+  workspace: initialWorkspace,
+}: {
+  view: ViewClient
+  workspace: LoadedWorkspace
+}) {
+  const { workspace, refresh, refreshing, error, clearError } = useRefreshableWorkspace(
+    view,
+    initialWorkspace,
+  )
+  const panel = useScenePanel(view)
+  const editor = panel.activeEditor
+  const isScene = editor ? isSceneEditorPath(editor.path) : false
+  const context =
+    panel.snapshot && isScene
+      ? sceneValidationContext(workspace, panel.snapshot.doc, panel.snapshot.path)
+      : null
+  const refreshAll = useCallback(() => {
+    refresh()
+    panel.sendIntent({ type: 'refresh-workspace' })
+  }, [panel, refresh])
+
+  return (
+    <div className="scene-panel-frame">
+      {panel.error && <PanelError message={panel.error} onDismiss={panel.clearError} />}
+      {error && <PanelError message={error} onDismiss={clearError} />}
+      {!isScene ? (
+        <PanelEmpty activePath={editor?.path} />
+      ) : panel.snapshot && context ? (
+        <HierarchyPanel
+          key={panel.snapshot.path}
+          doc={panel.snapshot.doc}
+          path={panel.snapshot.path}
+          selection={panel.snapshot.selection}
+          context={context}
+          workspace={workspace}
+          canWrite={panel.snapshot.canWrite}
+          refreshing={refreshing}
+          onRefresh={refreshAll}
+          onCommand={panel.sendCommand}
+          onIntent={panel.sendIntent}
+        />
+      ) : (
+        <PanelLoading />
+      )}
     </div>
   )
 }

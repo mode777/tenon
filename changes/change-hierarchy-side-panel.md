@@ -1,6 +1,6 @@
 # Change: hierarchy-side-panel
 
-Status: draft
+Status: doing
 Created: 2026-11-27
 
 ## 1. Proposal
@@ -103,7 +103,7 @@ The review findings are already fixed in `1d28a4e`: the docs and specs align on 
   the hierarchy panel; pass undo/redo/save/mode/refresh callbacks to the bridge.
 - **Docs:** update TD-26's contribution table, TD-31's layout rule, `docs/scene-editor-ui.md`,
   the M2 roadmap wording, `AGENTS.md`'s "per-document tools stay in editor frames" invariant,
-  README status/layout, and the baseline specs/architecture.
+  and README status/layout. Baseline specs are updated by `nsx-sync`, not by this apply step.
 - **Delivery:** bump the plugin version to `0.5.0`; keep Exo `>=0.11.0`; no permission or
   consent-fingerprint change.
 
@@ -121,69 +121,68 @@ The review findings are already fixed in `1d28a4e`: the docs and specs align on 
 
 ## 6. Acceptance Criteria & Validation
 
-- [ ] AC1 `HOST-PANELS`: The manifest declares `tenon.scene.hierarchy` as a primary panel and
+- [x] AC1 `HOST-PANELS`: The manifest declares `tenon.scene.hierarchy` as a primary panel and
   both scene/level entries bind it as a companion; the controller registers it. Validate:
   manifest/controller tests and opening a scene.
-- [ ] AC2 `SCENE-HIERARCHY-PANEL`: The panel shows the host hierarchy and
+- [x] AC2 `SCENE-HIERARCHY-PANEL`: The panel shows the host hierarchy and
   Entities/Scenes/Assets library; scene-instance internals stay hidden; opening a project or
   schema editor hides it; no active scene shows an empty state. Validate: panel and scene
   tests plus the M2 demo.
-- [ ] AC3 `SCENE-PANEL-COMMANDS`: Selection, add entity, add scene instance, and add asset
+- [x] AC3 `SCENE-PANEL-COMMANDS`: Selection, add entity, add scene instance, and add asset
   work from the panel; edits are dirty and undoable; read-only disables placement; the editor
   remains the only writer. Validate: command/reducer tests and interaction tests.
-- [ ] AC4 `SCENE-PANEL-SHORTCUTS`: With the panel focused, Delete/duplicate/escape/undo/redo/
+- [x] AC4 `SCENE-PANEL-SHORTCUTS`: With the panel focused, Delete/duplicate/escape/undo/redo/
   save/W/E/R behave as in the scene frame; search input suppresses them. Validate: keyboard
   interaction tests and manual check.
-- [ ] AC5 `SCENE-PANEL-REFRESH`: Refreshing after an external schema or asset change updates
+- [x] AC5 `SCENE-PANEL-REFRESH`: Refreshing after an external schema or asset change updates
   the panel and the editor validation context. Validate: refresh integration test and manual
   check.
-- [ ] AC6 Layout: The scene frame no longer renders the left pane; viewport, toolbar, and
+- [x] AC6 Layout: The scene frame no longer renders the left pane; viewport, toolbar, and
   save/conflict notices remain; the toolbar reveal action opens the panel. Validate: scene
   editor tests and the M2 demo.
-- [ ] AC7 Docs and specs: TD-26, TD-31, scene-editor-ui, roadmap, AGENTS, README, and the
-  baseline specs describe the new layout and the one-primary-view constraint. Validate:
-  doc/link checks.
+- [x] AC7 Docs: TD-26, TD-31, scene-editor-ui, roadmap, AGENTS, and README describe the new
+  layout and the one-primary-view constraint. Baseline specs stay unchanged until
+  `nsx-sync`. Validate: doc/link checks.
 - [ ] AC8 Quality gate: `npm test`, `npm run typecheck`, and `npm run build` pass; the GitHub
   Pages deploy succeeds. Validate: local commands and the CI run.
 
 ## 7. Questions & Decisions
 
-- [ ] Q1: Should this change provide full panel-focus shortcut parity (recommended) or only
-  Delete/Duplicate/Escape, leaving undo/redo/save/transform-mode shortcuts to the scene frame?
-  Recommended: full parity, because the current pane lives in the editor frame and moving it
-  out would otherwise regress keyboard behavior.
-- [ ] Q2: Is `tenon.scene.hierarchy` / **Hierarchy & Assets** / `list-tree` the right panel
-  identity? Recommended: yes; one panel holds both the tree and the library because the
-  primary sidebar shows one view at a time.
-- [ ] Q3: Should Refresh reload both the panel and the editor context (recommended) or only
-  the panel? Recommended: both, so validation and placement do not drift.
-- [ ] Q4: Bump the plugin manifest/package version from `0.4.0` to `0.5.0`? Recommended: yes;
-  this is a user-visible feature and does not change the consent fingerprint.
+- [x] Q1: Should this change provide full panel-focus shortcut parity or only
+  Delete/Duplicate/Escape? → Full parity. Why: the current pane lives in the editor frame, so
+  moving it out without forwarding shortcuts would regress keyboard behavior.
+- [x] Q2: Is `tenon.scene.hierarchy` / **Hierarchy & Assets** / `list-tree` the right panel
+  identity? → Yes. Why: one panel holds both the tree and the library because the primary
+  sidebar shows one view at a time.
+- [x] Q3: Should Refresh reload both the panel and the editor context? → Both. Why: validation
+  and placement must not drift after an external schema/asset change.
+- [x] Q4: Bump the plugin manifest/package version from `0.4.0` to `0.5.0`? → Yes. Why: this
+  is a user-visible feature and does not change the consent fingerprint.
 
 ## 8. Implementation Plan
 
-- [ ] T1 Add `tenon.scene.hierarchy` to the manifest, scene/level companions, and controller;
-  update manifest/controller tests. Files: `plugin/public/exo-manifest.json`,
-  `plugin/src/controller.ts`. Verify: manifest tests and a dev-shell scene open.
-- [ ] T2 Add the hierarchy view page, boot, panel component, and Vite input. Files:
+- [x] T1 Add `tenon.scene.hierarchy` to the manifest, scene/level companions, and controller;
+  add the manifest test. Files: `plugin/public/exo-manifest.json`,
+  `plugin/src/controller.ts`, `plugin/src/manifest.test.ts`. Verify: `npm test`.
+- [x] T2 Add the hierarchy view page, boot, panel component, and Vite input. Files:
   `plugin/views/hierarchy.html`, `plugin/src/scene/panels/hierarchy-main.tsx`,
   `HierarchyPanel.tsx`, `panel-roots.tsx`, `vite.config.ts`, panel CSS. Verify: panel mounts.
-- [ ] T3 Extend the scene panel snapshot/command layer with add-entity, add-scene-instance,
+- [x] T3 Extend the scene panel snapshot/command layer with add-entity, add-scene-instance,
   and add-asset; reuse the existing selection/command path. Files:
   `plugin/src/scene/scene-panel-protocol.ts`, `plugin/src/scene/scene-commands.ts`,
   `plugin/src/scene/useScenePanelBridge.ts`, tests. Verify: `npm test`.
-- [ ] T4 Add panel intents for undo, redo, save, set-mode, and refresh-workspace; wire
+- [x] T4 Add panel intents for undo, redo, save, set-mode, and refresh-workspace; wire
   editor callbacks in `SceneEditor` and `useScenePanelBridge`. Verify: bridge/editor tests.
-- [ ] T5 Build the hierarchy tree and library in the panel, using the snapshot plus
+- [x] T5 Build the hierarchy tree and library in the panel, using the snapshot plus
   read-only workspace context; add search, tabs, refresh, empty, and read-only states. Verify:
   panel tests.
-- [ ] T6 Add panel-focus keyboard handling and suppress shortcuts in text inputs; verify
+- [x] T6 Add panel-focus keyboard handling and suppress shortcuts in text inputs; verify
   Delete/duplicate/escape/undo/redo/save/W/E/R. Verify: interaction tests.
-- [ ] T7 Remove the scene frame's left pane and library-only state; add the Hierarchy toolbar
+- [x] T7 Remove the scene frame's left pane and library-only state; add the Hierarchy toolbar
   action; keep viewport/toolbar/save notices and the editor workspace context. Verify: scene
   editor tests and the M2 demo.
-- [ ] T8 Update TD-26, TD-31, scene-editor-ui, roadmap, AGENTS, README, and baseline specs;
-  run link checks. Verify: doc diff and `git diff --check`.
+- [x] T8 Update TD-26, TD-31, scene-editor-ui, roadmap, AGENTS, and README; do not edit
+  baseline specs during apply. Verify: doc diff, link checks, and `git diff --check`.
 - [ ] T9 Bump the plugin version to `0.5.0`; run `npm test`, `npm run typecheck`,
   `npm run build`; deploy and verify the M1/M2 demo workspaces. Files:
   `plugin/package.json`, `plugin/public/exo-manifest.json`. Verify: CI and deployed shell.

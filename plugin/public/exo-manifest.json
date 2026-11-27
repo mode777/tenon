@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "com.tenon.editor",
   "name": "Tenon",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Schema-first entity and scene authoring for Tenon projects.",
   "publisher": {
     "name": "Tenon"
@@ -41,7 +41,11 @@
         "label": "Tenon Scene",
         "priority": 30,
         "rendering": "frame",
-        "companionPanels": ["tenon.scene.inspector", "tenon.scene.inspection"]
+        "companionPanels": [
+          "tenon.scene.hierarchy",
+          "tenon.scene.inspector",
+          "tenon.scene.inspection"
+        ]
       },
       {
         "glob": "levels/*.scene.json",
@@ -49,7 +53,11 @@
         "label": "Tenon Level",
         "priority": 30,
         "rendering": "frame",
-        "companionPanels": ["tenon.scene.inspector", "tenon.scene.inspection"]
+        "companionPanels": [
+          "tenon.scene.hierarchy",
+          "tenon.scene.inspector",
+          "tenon.scene.inspection"
+        ]
       }
     ],
     "panels": [
@@ -59,6 +67,13 @@
         "icon": "symbol-structure",
         "location": "primary",
         "entry": "views/project.html"
+      },
+      {
+        "id": "tenon.scene.hierarchy",
+        "title": "Hierarchy & Assets",
+        "icon": "list-tree",
+        "location": "primary",
+        "entry": "views/hierarchy.html"
       },
       {
         "id": "tenon.scene.inspector",

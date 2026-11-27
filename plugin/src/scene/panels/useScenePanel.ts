@@ -6,6 +6,7 @@ import {
   SCENE_PANEL_TOPIC,
   isScenePanelMessage,
   type InspectionTab,
+  type SceneEditorIntent,
   type ScenePanelSnapshot,
 } from '../scene-panel-protocol'
 import { isSceneEditorPath } from '../scene-workspace'
@@ -17,6 +18,7 @@ export interface ScenePanelState {
   error: string | null
   focusTab: InspectionTab | null
   sendCommand: (command: SceneCommand) => void
+  sendIntent: (intent: SceneEditorIntent) => void
   clearError: () => void
   clearFocusTab: () => void
 }
@@ -232,6 +234,28 @@ export function useScenePanel(
     [view],
   )
 
+  const sendIntent = useCallback(
+    (intent: SceneEditorIntent) => {
+      const editor = activeRef.current
+      if (!editor || !isSceneEditorPath(editor.path)) {
+        setError('Open a scene or level before using the scene editor controls.')
+        return
+      }
+      const requestId = `intent-${++requestIdRef.current}`
+      void view
+        .publishLocal(SCENE_PANEL_TOPIC, {
+          kind: 'intent',
+          target: editor.instanceId,
+          requestId,
+          intent,
+        })
+        .catch((cause: unknown) => {
+          setError(`Could not reach the scene editor: ${errorMessage(cause)}`)
+        })
+    },
+    [view],
+  )
+
   const clearError = useCallback(() => setError(null), [])
   const clearFocusTab = useCallback(() => setFocusTab(null), [])
 
@@ -242,6 +266,7 @@ export function useScenePanel(
     error,
     focusTab,
     sendCommand,
+    sendIntent,
     clearError,
     clearFocusTab,
   }

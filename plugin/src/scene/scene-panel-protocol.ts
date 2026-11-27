@@ -2,10 +2,19 @@ import type { SceneDocument } from '../core/scene'
 import type { SceneCommand } from './scene-commands'
 
 export const SCENE_PANEL_TOPIC = 'local/tenon.scene' as const
+export const HIERARCHY_PANEL_ID = 'tenon.scene.hierarchy'
 export const INSPECTOR_PANEL_ID = 'tenon.scene.inspector'
 export const INSPECTION_PANEL_ID = 'tenon.scene.inspection'
 
 export type InspectionTab = 'validation' | 'public' | 'debug'
+export type SceneTransformMode = 'translate' | 'rotate' | 'scale'
+
+export type SceneEditorIntent =
+  | { type: 'undo' }
+  | { type: 'redo' }
+  | { type: 'save' }
+  | { type: 'set-mode'; mode: SceneTransformMode }
+  | { type: 'refresh-workspace' }
 
 export interface ScenePanelSnapshot {
   revision: number
@@ -20,6 +29,7 @@ export type ScenePanelMessage =
   | { kind: 'snapshot-request'; target: string; requestId: string }
   | { kind: 'snapshot'; snapshot: ScenePanelSnapshot }
   | { kind: 'command'; target: string; requestId: string; command: SceneCommand }
+  | { kind: 'intent'; target: string; requestId: string; intent: SceneEditorIntent }
   | { kind: 'command-result'; requestId: string; ok: boolean; message?: string }
   | { kind: 'focus-tab'; path: string; tab: InspectionTab }
   | { kind: 'discover'; requestId: string }
@@ -27,6 +37,21 @@ export type ScenePanelMessage =
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isSceneEditorIntent(value: unknown): value is SceneEditorIntent {
+  if (!isRecord(value) || typeof value.type !== 'string') return false
+  switch (value.type) {
+    case 'undo':
+    case 'redo':
+    case 'save':
+    case 'refresh-workspace':
+      return true
+    case 'set-mode':
+      return value.mode === 'translate' || value.mode === 'rotate' || value.mode === 'scale'
+    default:
+      return false
+  }
 }
 
 /** Minimal validation of plugin-local messages; the shell never interprets them. */
@@ -43,6 +68,12 @@ export function isScenePanelMessage(value: unknown): value is ScenePanelMessage 
         typeof value.requestId === 'string' &&
         isRecord(value.command) &&
         typeof value.command.type === 'string'
+      )
+    case 'intent':
+      return (
+        typeof value.target === 'string' &&
+        typeof value.requestId === 'string' &&
+        isSceneEditorIntent(value.intent)
       )
     case 'command-result':
       return (

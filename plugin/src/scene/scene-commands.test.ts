@@ -87,6 +87,45 @@ describe('applySceneCommand', () => {
     expect(entityById(deleted.doc, duplicated.selection!)).toBeUndefined()
   })
 
+  it('adds entities, scene instances, and assets', () => {
+    const doc = levelScene()
+    const context = contextFor(doc)
+
+    const withEntity = applySceneCommand(
+      doc,
+      { type: 'add-entity', definition: 'game:engine', parentId: 'root' },
+      context,
+    )
+    expect(entityById(withEntity.doc, withEntity.selection!)).toMatchObject({
+      type: 'game:engine',
+      parent: 'root',
+    })
+
+    const withInstance = applySceneCommand(
+      withEntity.doc,
+      {
+        type: 'add-scene-instance',
+        scenePath: '/scenes/train.scene.json',
+        parentId: 'root',
+      },
+      context,
+    )
+    expect(entityById(withInstance.doc, withInstance.selection!)).toMatchObject({
+      scene: '/scenes/train.scene.json',
+      parent: 'root',
+    })
+
+    const withAsset = applySceneCommand(
+      withEntity.doc,
+      { type: 'add-asset', asset: '/assets/cube.glb', parentId: 'root' },
+      context,
+    )
+    expect(entityById(withAsset.doc, withAsset.selection!)).toMatchObject({
+      type: 'basic3d:mesh',
+      props: { mesh: '/assets/cube.glb' },
+    })
+  })
+
   it('adds and removes promotions and slots', () => {
     const doc = levelScene()
     const context = contextFor(doc)

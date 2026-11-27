@@ -1,11 +1,14 @@
 import { cloneJson } from '../core/schema'
 import {
+  addEntity,
   addPromotion,
+  addSceneInstance,
   addSlot,
   deleteEntity,
   duplicateEntity,
   entityById,
   entityIsSceneInstance,
+  normalizeScenePath,
   removeEntityProp,
   removePromotion,
   removeSlot,
@@ -38,6 +41,9 @@ export type SceneCommand =
   | { type: 'reset-prop'; entityId: string; name: string }
   | { type: 'delete-entity'; entityId: string }
   | { type: 'duplicate-entity'; entityId: string }
+  | { type: 'add-entity'; definition: string; parentId: string }
+  | { type: 'add-scene-instance'; scenePath: string; parentId: string }
+  | { type: 'add-asset'; asset: string; parentId: string }
   | {
       type: 'add-promotion'
       name: string
@@ -155,6 +161,29 @@ export function applySceneCommand(
     case 'duplicate-entity': {
       const duplicated = duplicateEntity(doc, command.entityId)
       return { doc: duplicated.scene, selection: duplicated.id }
+    }
+    case 'add-entity': {
+      const added = addEntity(doc, command.definition, command.parentId)
+      return {
+        doc: withTypeRequirement(added.scene, command.definition, context),
+        selection: added.id,
+      }
+    }
+    case 'add-scene-instance': {
+      const added = addSceneInstance(doc, command.scenePath, command.parentId)
+      return { doc: added.scene, selection: added.id }
+    }
+    case 'add-asset': {
+      const added = addEntity(doc, 'basic3d:mesh', command.parentId)
+      return {
+        doc: setEntityProp(
+          added.scene,
+          added.id,
+          'mesh',
+          normalizeScenePath(command.asset),
+        ),
+        selection: added.id,
+      }
     }
     case 'add-promotion':
       return {

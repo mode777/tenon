@@ -133,9 +133,9 @@ The sample loads, resolves defaults, and reports errors for deliberately broken 
 - Minimal project editor: import map for the locations of schema packages, resolved schema versions, and project-wide validation.
 - New Scene action on the project hub.
 - Scene editor frame for `scenes/*.scene.json` and `levels/*.scene.json`.
-- Inspector and Inspection shell panels that follow the active scene/level editor; the manifest requires Exo 0.11.0+ for automatic companion panels.
+- Hierarchy, Inspector, and Inspection shell panels that follow the active scene/level editor; the manifest requires Exo 0.11.0+ for automatic companion panels.
 - 3D viewport with three.js, React Three Fiber, and drei.
-- Scene hierarchy, schema-generated Inspector and Inspection shell panels (secondary and bottom), entity and scene palettes, and asset browser.
+- Hierarchy & Assets primary shell panel, schema-generated Inspector and Inspection shell panels (secondary and bottom), entity and scene palettes, and asset browser.
 - Place, select, move, rotate, scale, duplicate, and delete entities.
 - Save and reload scene documents through the shell; undo/redo per document.
 - Level mode: the same scene editor with level-only controls.

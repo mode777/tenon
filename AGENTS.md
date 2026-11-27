@@ -114,8 +114,12 @@ scripts, generator editor) are still planned; do not create them just to "verify
   schema data and adds no page, glob, or editor code.
 - The project hub panel (`tenon.project`) is the only project-level shell panel. It hosts
   the New Schema and New Scene actions and is the target of the `tenon.new-schema` and
-  `tenon.new-scene` commands. Per-document tools stay in editor frames; the scene
-  Inspector and Inspection panels are document-scoped.
+  `tenon.new-scene` commands. Per-document tools stay in editor frames except the
+  document-scoped scene panels: Hierarchy & Assets, Inspector, and Inspection.
+- Scene and level editors declare the primary Hierarchy & Assets, secondary Inspector,
+  and bottom Inspection panels as companions. The hierarchy panel owns the tree and
+  entity/scene/asset library; the scene frame keeps the viewport, toolbar, and save
+  notices. The editor remains the only writer.
 - New Schema and New Scene require Exo 0.8.0+ command-scoped user activation; the panel
   may call `requestNewFile` during its live command invocation without owning DOM focus.
 - The schema and project editors are DOM-only frames. The scene editor is M2 and adds

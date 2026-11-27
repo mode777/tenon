@@ -20,6 +20,7 @@ export default defineConfig(({ command }) => ({
         'editors/schema.html',
         'editors/scene.html',
         'views/project.html',
+        'views/hierarchy.html',
         'views/inspector.html',
         'views/inspection.html',
       ],
