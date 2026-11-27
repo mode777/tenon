@@ -1,6 +1,6 @@
 # Change: hierarchy-side-panel
 
-Status: doing
+Status: done
 Created: 2026-11-27
 
 ## 1. Proposal
@@ -143,7 +143,7 @@ The review findings are already fixed in `1d28a4e`: the docs and specs align on 
 - [x] AC7 Docs: TD-26, TD-31, scene-editor-ui, roadmap, AGENTS, and README describe the new
   layout and the one-primary-view constraint. Baseline specs stay unchanged until
   `nsx-sync`. Validate: doc/link checks.
-- [ ] AC8 Quality gate: `npm test`, `npm run typecheck`, and `npm run build` pass; the GitHub
+- [x] AC8 Quality gate: `npm test`, `npm run typecheck`, and `npm run build` pass; the GitHub
   Pages deploy succeeds. Validate: local commands and the CI run.
 
 ## 7. Questions & Decisions
@@ -183,6 +183,6 @@ The review findings are already fixed in `1d28a4e`: the docs and specs align on 
   editor tests and the M2 demo.
 - [x] T8 Update TD-26, TD-31, scene-editor-ui, roadmap, AGENTS, and README; do not edit
   baseline specs during apply. Verify: doc diff, link checks, and `git diff --check`.
-- [ ] T9 Bump the plugin version to `0.5.0`; run `npm test`, `npm run typecheck`,
+- [x] T9 Bump the plugin version to `0.5.0`; run `npm test`, `npm run typecheck`,
   `npm run build`; deploy and verify the M1/M2 demo workspaces. Files:
   `plugin/package.json`, `plugin/public/exo-manifest.json`. Verify: CI and deployed shell.
