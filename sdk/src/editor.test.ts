@@ -197,6 +197,47 @@ describe('editor client', () => {
     expect(transport.posted).toHaveLength(posted)
   })
 
+  it('delivers id-less undo and redo intents without sending anything', async () => {
+    const { transport, editor } = await connect()
+    const calls: string[] = []
+    const offFirst = editor.onUndoRequest(() => calls.push('undo-1'))
+    const offSecond = editor.onUndoRequest(() => calls.push('undo-2'))
+    editor.onRedoRequest(() => calls.push('redo'))
+    const posted = transport.posted.length
+
+    transport.emit({ exo: 1, type: 'shell/undo' })
+    expect(calls).toEqual(['undo-1', 'undo-2'])
+    transport.emit({ exo: 1, type: 'shell/redo' })
+    expect(calls).toEqual(['undo-1', 'undo-2', 'redo'])
+    expect(transport.posted).toHaveLength(posted)
+
+    offFirst()
+    offSecond()
+    transport.emit({ exo: 1, type: 'shell/undo' })
+    expect(calls).toEqual(['undo-1', 'undo-2', 'redo'])
+  })
+
+  it('contains history listener errors, ignores a missing listener and stops after close', async () => {
+    const bare = await connect()
+    const before = bare.transport.posted.length
+    bare.transport.emit({ exo: 1, type: 'shell/undo' })
+    bare.transport.emit({ exo: 1, type: 'shell/redo' })
+    expect(bare.transport.posted).toHaveLength(before)
+
+    const { transport, editor } = await connect()
+    const calls: string[] = []
+    editor.onUndoRequest(() => {
+      throw new Error('boom')
+    })
+    editor.onUndoRequest(() => calls.push('after'))
+    transport.emit({ exo: 1, type: 'shell/undo' })
+    expect(calls).toEqual(['after'])
+
+    editor.close()
+    transport.emit({ exo: 1, type: 'shell/redo' })
+    expect(calls).toEqual(['after'])
+  })
+
   it('answers a save request and exposes the result', async () => {
     const { transport, editor } = await connect()
     editor.onSaveRequest(() => ({ text: 'saved text' }))

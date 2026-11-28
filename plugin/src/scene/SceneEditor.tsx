@@ -1,7 +1,8 @@
 import type { EditorClient } from '@exo/plugin-sdk'
 import { ExoProtocolError, type FileChangedPayload } from '@exo/plugin-sdk'
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
-import { useHistory } from '../core/history'
+import { useDocumentHistory } from '../core/history'
+import { useShellHistory } from '../core/useShellHistory'
 import { cloneJson } from '../core/schema'
 import {
   entityById,
@@ -51,10 +52,16 @@ export function SceneEditor({
   workspace: initialWorkspace,
   Viewport,
 }: SceneEditorProps) {
-  const history = useHistory(initialDoc, cloneJson)
-  const doc = history.state.doc
+  const history = useDocumentHistory<SceneDocument, string | null>(
+    initialDoc,
+    initialDoc.root,
+    cloneJson,
+  )
+  const doc = history.doc
+  const selection = history.selection
+  const setSelection = history.select
+  useShellHistory(client, { canWrite, undo: history.undo, redo: history.redo })
   const [savedText, setSavedText] = useState(() => sceneToText(initialDoc))
-  const [selection, setSelection] = useState<string | null>(initialDoc.root)
   const [mode, setMode] = useState<TransformMode>('translate')
   const [snap, setSnap] = useState(false)
   const [workspace, setWorkspace] = useState(initialWorkspace)
@@ -134,9 +141,8 @@ export function SceneEditor({
     try {
       const content = await client.readFile(pathRef.current, 'utf8')
       const next = parseSceneText(content.text)
-      history.reset(next)
+      history.reset(next, next.root)
       setSavedText(sceneToText(next))
-      setSelection(next.root)
       setExternal(null)
       showNotice('Reloaded from disk')
     } catch (error) {
@@ -249,13 +255,23 @@ export function SceneEditor({
         client.requestSave()
         return
       }
-      if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+      if (
+        !editing &&
+        canWrite &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 'z'
+      ) {
         event.preventDefault()
         if (event.shiftKey) history.redo()
         else history.undo()
         return
       }
-      if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
+      if (
+        !editing &&
+        canWrite &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 'y'
+      ) {
         event.preventDefault()
         history.redo()
         return

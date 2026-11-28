@@ -39,14 +39,24 @@ describe('InspectorPanel', () => {
     const { onCommand } = renderInspector('button_1')
 
     expect(screen.getByRole('heading', { name: 'Inspector' })).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Entity name'), { target: { value: 'Button' } })
+    const name = screen.getByLabelText('Entity name')
+    fireEvent.change(name, { target: { value: 'Button' } })
+    expect(onCommand).not.toHaveBeenCalled()
+    fireEvent.blur(name)
     expect(onCommand).toHaveBeenLastCalledWith({
       type: 'set-entity-name',
       entityId: 'button_1',
       value: 'Button',
     })
 
-    fireEvent.change(screen.getByDisplayValue('Press'), { target: { value: 'Go' } })
+    const label = screen.getByDisplayValue('Press')
+    fireEvent.change(label, { target: { value: 'Go' } })
+    expect(onCommand).toHaveBeenLastCalledWith({
+      type: 'set-entity-name',
+      entityId: 'button_1',
+      value: 'Button',
+    })
+    fireEvent.blur(label)
     expect(onCommand).toHaveBeenLastCalledWith({
       type: 'set-prop',
       entityId: 'button_1',
@@ -56,6 +66,13 @@ describe('InspectorPanel', () => {
 
     const position = screen.getAllByRole('spinbutton')[0]
     fireEvent.change(position, { target: { value: '4' } })
+    expect(onCommand).toHaveBeenLastCalledWith({
+      type: 'set-prop',
+      entityId: 'button_1',
+      name: 'label',
+      value: 'Go',
+    })
+    fireEvent.blur(position)
     expect(onCommand).toHaveBeenLastCalledWith({
       type: 'set-transform',
       entityId: 'button_1',
@@ -92,7 +109,10 @@ describe('InspectorPanel', () => {
     const { onCommand } = renderInspector(null, true, doc)
 
     expect(screen.getByRole('heading', { name: 'Scene settings' })).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Scene ID'), { target: { value: 'level_02' } })
+    const sceneId = screen.getByLabelText('Scene ID')
+    fireEvent.change(sceneId, { target: { value: 'level_02' } })
+    expect(onCommand).not.toHaveBeenCalled()
+    fireEvent.blur(sceneId)
     expect(onCommand).toHaveBeenLastCalledWith({ type: 'set-scene-id', id: 'level_02' })
 
     await user.click(screen.getByRole('button', { name: 'Add requirement' }))

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ComponentType } from 'react'
 import type { EditorClient } from '@exo/plugin-sdk'
 import { hashText } from '../core/project'
 import type { SchemaBundle } from '../core/schema'
@@ -94,6 +95,8 @@ function workspace(train = trainScene()): LoadedWorkspace {
 function mockClient() {
   const saveHandlers: Array<() => { text: string }> = []
   const dirty: boolean[] = []
+  const undoListeners = new Set<() => void>()
+  const redoListeners = new Set<() => void>()
   const requestPanel = vi.fn(async (panel: string) => ({ panel, open: true }))
   const requestSave = vi.fn()
   const client = {
@@ -107,6 +110,18 @@ function mockClient() {
       return () => undefined
     },
     onSaveResult: () => () => undefined,
+    onUndoRequest: (listener: () => void) => {
+      undoListeners.add(listener)
+      return () => {
+        undoListeners.delete(listener)
+      }
+    },
+    onRedoRequest: (listener: () => void) => {
+      redoListeners.add(listener)
+      return () => {
+        redoListeners.delete(listener)
+      }
+    },
     onFileChanged: () => () => undefined,
     onDispose: () => () => undefined,
     onError: () => () => undefined,
@@ -134,15 +149,56 @@ function mockClient() {
       return { entries: [] }
     },
   } as unknown as EditorClient
-  return { client, saveHandlers, dirty, requestPanel, requestSave }
+  return {
+    client,
+    saveHandlers,
+    dirty,
+    requestPanel,
+    requestSave,
+    emitUndo: () => {
+      for (const listener of [...undoListeners]) listener()
+    },
+    emitRedo: () => {
+      for (const listener of [...redoListeners]) listener()
+    },
+  }
 }
 
 function StubViewport(_props: SceneViewportProps) {
   return <div data-testid="viewport" />
 }
 
-function renderEditor(doc = levelScene(), ws = workspace(), canWrite = true) {
-  const { client, saveHandlers, dirty, requestPanel, requestSave } = mockClient()
+function SelectionViewport(props: SceneViewportProps) {
+  return (
+    <div data-testid="viewport">
+      <span data-testid="selection">{props.selection ?? 'none'}</span>
+      <button type="button" onClick={() => props.onSelect('button_1')}>
+        Select button
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          props.onTransform('button_1', {
+            position: [2, 0, 0],
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1],
+          })
+        }
+      >
+        Move button
+      </button>
+    </div>
+  )
+}
+
+function renderEditor(
+  doc = levelScene(),
+  ws = workspace(),
+  canWrite = true,
+  Viewport: ComponentType<SceneViewportProps> = StubViewport,
+) {
+  const { client, saveHandlers, dirty, requestPanel, requestSave, emitUndo, emitRedo } =
+    mockClient()
   const result = render(
     <SceneEditor
       client={client}
@@ -151,10 +207,10 @@ function renderEditor(doc = levelScene(), ws = workspace(), canWrite = true) {
       levelMode
       canWrite={canWrite}
       workspace={ws}
-      Viewport={StubViewport}
+      Viewport={Viewport}
     />,
   )
-  return { ...result, client, saveHandlers, dirty, requestPanel, requestSave }
+  return { ...result, client, saveHandlers, dirty, requestPanel, requestSave, emitUndo, emitRedo }
 }
 
 afterEach(() => {
@@ -204,6 +260,73 @@ describe('SceneEditor', () => {
     expect(requestSave).toHaveBeenCalled()
   })
 
+  it('restores selection when undoing a delete', async () => {
+    const user = userEvent.setup()
+    renderEditor(levelScene(), workspace(), true, SelectionViewport)
+
+    await user.click(screen.getByRole('button', { name: 'Select button' }))
+    expect(screen.getByTestId('selection').textContent).toBe('button_1')
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.getByTestId('selection').textContent).toBe('none')
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getByTestId('selection').textContent).toBe('button_1')
+  })
+
+  it('undoes a viewport transform as one history step', async () => {
+    const user = userEvent.setup()
+    const { saveHandlers, dirty } = renderEditor(
+      levelScene(),
+      workspace(),
+      true,
+      SelectionViewport,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Select button' }))
+    await user.click(screen.getByRole('button', { name: 'Move button' }))
+    const moved = JSON.parse(saveHandlers[0]().text)
+    expect(moved.entities.find((entity: { id: string }) => entity.id === 'button_1').transform)
+      .toEqual({ position: [2, 0, 0] })
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    const undone = JSON.parse(saveHandlers[0]().text)
+    expect(undone.entities.find((entity: { id: string }) => entity.id === 'button_1').transform)
+      .toBeUndefined()
+    expect(screen.getByTestId('selection').textContent).toBe('button_1')
+    await waitFor(() => expect(dirty.at(-1)).toBe(false))
+  })
+
+  it('applies shell undo and redo intents', async () => {
+    const user = userEvent.setup()
+    const { emitUndo, emitRedo } = renderEditor(levelScene(), workspace(), true, SelectionViewport)
+
+    await user.click(screen.getByRole('button', { name: 'Select button' }))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.getByTestId('selection').textContent).toBe('none')
+
+    act(() => emitUndo())
+    expect(screen.getByTestId('selection').textContent).toBe('button_1')
+
+    act(() => emitRedo())
+    expect(screen.getByTestId('selection').textContent).toBe('none')
+  })
+
+  it('handles undo and redo keyboard shortcuts', async () => {
+    const user = userEvent.setup()
+    renderEditor(levelScene(), workspace(), true, SelectionViewport)
+
+    await user.click(screen.getByRole('button', { name: 'Select button' }))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.getByTestId('selection').textContent).toBe('none')
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
+    expect(screen.getByTestId('selection').textContent).toBe('button_1')
+
+    fireEvent.keyDown(window, { key: 'y', ctrlKey: true })
+    expect(screen.getByTestId('selection').textContent).toBe('none')
+  })
+
   it('disables editing controls in a read-only workspace', () => {
     renderEditor(levelScene(), workspace(), false)
     expect((screen.getByRole('button', { name: 'Duplicate' }) as HTMLButtonElement).disabled).toBe(
@@ -212,5 +335,7 @@ describe('SceneEditor', () => {
     expect((screen.getByRole('button', { name: 'Delete' }) as HTMLButtonElement).disabled).toBe(
       true,
     )
+    expect((screen.getByRole('button', { name: 'Undo' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Redo' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

@@ -64,6 +64,8 @@ export class EditorClient extends FrameClient {
   private readonly editorInit: EditorInit
   private readonly saveResultListeners = new Set<SaveResultListener>()
   private readonly fileChangedListeners = new Set<FileChangedListener>()
+  private readonly undoListeners = new Set<() => void>()
+  private readonly redoListeners = new Set<() => void>()
   private readonly saveHandlers: SaveHandler[] = []
   private metadata: FileMetadata
   private liveSaveId: string | null = null
@@ -85,6 +87,8 @@ export class EditorClient extends FrameClient {
     gate.on('shell/save-result', (envelope) =>
       this.handleSaveResult(envelope.replyTo, envelope.payload),
     )
+    gate.on('shell/undo', () => this.notifyHistory(this.undoListeners))
+    gate.on('shell/redo', () => this.notifyHistory(this.redoListeners))
     gate.on('shell/file-changed', (envelope) => this.handleFileChanged(envelope.payload))
   }
 
@@ -136,6 +140,34 @@ export class EditorClient extends FrameClient {
     this.saveResultListeners.add(listener)
     return () => {
       this.saveResultListeners.delete(listener)
+    }
+  }
+
+  /** Receive the shell's id-less undo intent for the bound document. */
+  onUndoRequest(listener: () => void): () => void {
+    return this.addHistoryListener(this.undoListeners, listener)
+  }
+
+  /** Receive the shell's id-less redo intent for the bound document. */
+  onRedoRequest(listener: () => void): () => void {
+    return this.addHistoryListener(this.redoListeners, listener)
+  }
+
+  private addHistoryListener(listeners: Set<() => void>, listener: () => void): () => void {
+    listeners.add(listener)
+    return () => {
+      listeners.delete(listener)
+    }
+  }
+
+  private notifyHistory(listeners: Set<() => void>): void {
+    if (this.closed) return
+    for (const listener of [...listeners]) {
+      try {
+        listener()
+      } catch {
+        // A listener must not break later history notifications.
+      }
     }
   }
 

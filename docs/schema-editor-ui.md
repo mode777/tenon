@@ -126,8 +126,8 @@ The initial template is intentionally boring:
 }
 ```
 
-The user edits the identity in the bundle header. No extra creation modal is
-needed.
+The user edits the identity in the bundle header. Identity fields commit on
+blur/Enter, so one edit is one undo step. No extra creation modal is needed.
 
 ## Layout
 
@@ -156,8 +156,9 @@ needed.
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The layout is three panes plus a validation status bar:
+The layout is a header, three panes, and a validation status bar:
 
+- **Header** — bundle identity, Undo/Redo, save state, validation, and help.
 - **Left sidebar** — search, definitions, builtin, imports, enums.
 - **Center** — the selected definition, its fields and events, and the
   effective view.
@@ -449,6 +450,7 @@ Initial rules:
 | `↑` / `↓` | Move selection in the sidebar or table |
 | `Cmd/Ctrl+Z` | Undo |
 | `Cmd/Ctrl+Shift+Z` | Redo |
+| `Ctrl/Cmd+Y` | Redo |
 | `?` | Shortcut cheat sheet |
 | `Ctrl/Cmd+Shift+P` | Exo command palette (shell) |
 

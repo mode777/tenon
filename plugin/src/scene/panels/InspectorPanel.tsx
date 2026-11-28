@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { cloneJson } from '../../core/schema'
 import {
   displayScenePath,
@@ -29,19 +29,20 @@ function formatNumber(value: number): string {
 
 function TextInput({
   value,
-  onChange,
+  onCommit,
   disabled,
   placeholder,
   ariaLabel,
 }: {
   value: string
-  onChange: (value: string) => void
+  onCommit: (value: string) => void
   disabled?: boolean
   placeholder?: string
   ariaLabel?: string
 }) {
   const [draft, setDraft] = useState(value)
   const [editing, setEditing] = useState(false)
+  const cancelled = useRef(false)
   useEffect(() => {
     if (!editing) setDraft(value)
   }, [editing, value])
@@ -53,17 +54,30 @@ function TextInput({
       aria-label={ariaLabel}
       disabled={disabled}
       onFocus={() => {
+        cancelled.current = false
         setDraft(value)
         setEditing(true)
       }}
       onBlur={() => {
         setEditing(false)
-        setDraft(value)
+        if (cancelled.current) {
+          cancelled.current = false
+          setDraft(value)
+          return
+        }
+        if (draft !== value) onCommit(draft)
       }}
-      onChange={(event) => {
-        const next = event.target.value
-        setDraft(next)
-        onChange(next)
+      onChange={(event) => setDraft(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          event.currentTarget.blur()
+        }
+        if (event.key === 'Escape') {
+          cancelled.current = true
+          setDraft(value)
+          event.currentTarget.blur()
+        }
       }}
     />
   )
@@ -71,17 +85,18 @@ function TextInput({
 
 function NumberInput({
   value,
-  onChange,
+  onCommit,
   step = 0.1,
   disabled,
 }: {
   value: number
-  onChange: (value: number) => void
+  onCommit: (value: number) => void
   step?: number
   disabled?: boolean
 }) {
   const [draft, setDraft] = useState(formatNumber(value))
   const [editing, setEditing] = useState(false)
+  const cancelled = useRef(false)
   useEffect(() => {
     if (!editing) setDraft(formatNumber(value))
   }, [editing, value])
@@ -92,18 +107,32 @@ function NumberInput({
       value={editing ? draft : formatNumber(value)}
       disabled={disabled}
       onFocus={() => {
+        cancelled.current = false
         setDraft(formatNumber(value))
         setEditing(true)
       }}
       onBlur={() => {
         setEditing(false)
-        setDraft(formatNumber(value))
+        if (cancelled.current) {
+          cancelled.current = false
+          setDraft(formatNumber(value))
+          return
+        }
+        const parsed = Number(draft)
+        if (Number.isFinite(parsed) && parsed !== value) onCommit(parsed)
+        else setDraft(formatNumber(value))
       }}
-      onChange={(event) => {
-        const text = event.target.value
-        setDraft(text)
-        const parsed = Number(text)
-        if (Number.isFinite(parsed)) onChange(parsed)
+      onChange={(event) => setDraft(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          event.currentTarget.blur()
+        }
+        if (event.key === 'Escape') {
+          cancelled.current = true
+          setDraft(formatNumber(value))
+          event.currentTarget.blur()
+        }
       }}
     />
   )
@@ -155,7 +184,7 @@ function FieldValueEditor({
         value={typeof prop.value === 'number' ? prop.value : 0}
         step={field.type === 'int' ? 1 : 0.1}
         disabled={disabled}
-        onChange={onChange}
+        onCommit={onChange}
       />
     )
   }
@@ -164,7 +193,7 @@ function FieldValueEditor({
       <TextInput
         value={typeof prop.value === 'string' ? prop.value : ''}
         disabled={disabled}
-        onChange={onChange}
+        onCommit={onChange}
       />
     )
   }
@@ -233,7 +262,7 @@ function FieldValueEditor({
             placeholder="/assets/…"
             ariaLabel="Asset path"
             disabled={disabled}
-            onChange={(value) => onChange(value || null)}
+            onCommit={(value) => onChange(value || null)}
           />
           {refreshButton}
         </div>
@@ -275,7 +304,7 @@ function FieldValueEditor({
             key={index}
             value={typeof value[index] === 'number' ? value[index] : (defaults[index] ?? 0)}
             disabled={disabled}
-            onChange={(next) => {
+            onCommit={(next) => {
               const copy = [...value]
               copy[index] = next
               onChange(copy)
@@ -322,7 +351,7 @@ function SceneSettings({
             value={scene.id}
             ariaLabel="Scene ID"
             disabled={!canWrite}
-            onChange={(id) => onCommand({ type: 'set-scene-id', id })}
+            onCommit={(id) => onCommand({ type: 'set-scene-id', id })}
           />
         </label>
       </section>
@@ -348,7 +377,7 @@ function SceneSettings({
                   value={entry}
                   ariaLabel={`Schema requirement ${index + 1}`}
                   disabled={!canWrite}
-                  onChange={(value) => onCommand({ type: 'set-requirement', index, value })}
+                  onCommit={(value) => onCommand({ type: 'set-requirement', index, value })}
                 />
                 <button
                   type="button"
@@ -461,7 +490,7 @@ function EntityInspector({
             ariaLabel="Entity name"
             placeholder={entityLabel(entity)}
             disabled={!canWrite}
-            onChange={(value) =>
+            onCommit={(value) =>
               onCommand({ type: 'set-entity-name', entityId: entity.id, value })
             }
           />
@@ -627,7 +656,7 @@ function EntityInspector({
                   <NumberInput
                     value={transform[component][index]}
                     disabled={!canWrite}
-                    onChange={(value) => {
+                    onCommit={(value) => {
                       const next = cloneJson(transform)
                       next[component][index] = value
                       onCommand({

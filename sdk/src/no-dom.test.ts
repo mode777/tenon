@@ -8,7 +8,7 @@ describe('DOM-free core', () => {
     expect(typeof location).toBe('undefined')
     expect(typeof (globalThis as { parent?: unknown }).parent).toBe('undefined')
     expect(sdk.PROTOCOL_VERSION).toBe('1')
-    expect(sdk.SDK_VERSION).toBe('1.10.0')
+    expect(sdk.SDK_VERSION).toBe('1.11.0')
     expect(typeof sdk.connectPlugin).toBe('function')
   })
 })

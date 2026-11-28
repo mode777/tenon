@@ -1,6 +1,6 @@
 {
   "name": "@tenon/plugin",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Tenon schema, project, and scene editors for the Exo shell",
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@exo/plugin-sdk": "1.10.0",
+    "@exo/plugin-sdk": "1.11.0",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "react": "^19.3.1",

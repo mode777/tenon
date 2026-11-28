@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "com.tenon.editor",
   "name": "Tenon",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Schema-first entity and scene authoring for Tenon projects.",
   "publisher": {
     "name": "Tenon"

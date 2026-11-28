@@ -49,6 +49,8 @@ import {
   type SchemaPackageIssue,
   type ValidationIssue,
 } from '../core/schema'
+import { useDocumentHistory } from '../core/history'
+import { useShellHistory } from '../core/useShellHistory'
 import { FieldEditor } from './FieldEditor'
 import { CommitInput } from './Inputs'
 
@@ -56,6 +58,13 @@ type Selection =
   | { kind: 'definition'; id: string }
   | { kind: 'enum'; name: string }
   | null
+
+interface SchemaSelection {
+  target: Selection
+  field: string | null
+  event: string | null
+  payloadField: string | null
+}
 
 type DetailTab = 'fields' | 'events' | 'effective'
 
@@ -75,18 +84,14 @@ function initialSelection(doc: SchemaBundle, builtin: SchemaBundle): Selection {
   return built ? { kind: 'definition', id: built } : null
 }
 
-interface HistoryState {
-  doc: SchemaBundle
-  past: SchemaBundle[]
-  future: SchemaBundle[]
+function initialSchemaSelection(doc: SchemaBundle, builtin: SchemaBundle): SchemaSelection {
+  return { target: initialSelection(doc, builtin), field: null, event: null, payloadField: null }
 }
 
 interface Toast {
   kind: 'notice' | 'error'
   message: string
 }
-
-const HISTORY_LIMIT = 100
 
 function reorderRecord<T>(record: Record<string, T>, key: string, direction: -1 | 1): Record<string, T> {
   const entries = Object.entries(record)
@@ -128,60 +133,6 @@ function eventByOrigin(effective: EffectiveDefinition, name: string): EffectiveE
   return effective.events.find((event) => event.name === name)
 }
 
-function useHistory(initial: SchemaBundle) {
-  const [state, setState] = useState<HistoryState>({ doc: initial, past: [], future: [] })
-
-  const update = (recipe: (doc: SchemaBundle) => void) => {
-    setState((previous) => {
-      const next = cloneJson(previous.doc)
-      recipe(next)
-      return {
-        doc: next,
-        past: [...previous.past, previous.doc].slice(-HISTORY_LIMIT),
-        future: [],
-      }
-    })
-  }
-
-  const reset = (doc: SchemaBundle) => {
-    setState({ doc, past: [], future: [] })
-  }
-
-  const replace = (doc: SchemaBundle) => {
-    setState((previous) => ({
-      doc,
-      past: [...previous.past, previous.doc].slice(-HISTORY_LIMIT),
-      future: [],
-    }))
-  }
-
-  const undo = () => {
-    setState((previous) => {
-      const previousDoc = previous.past.at(-1)
-      if (!previousDoc) return previous
-      return {
-        doc: previousDoc,
-        past: previous.past.slice(0, -1),
-        future: [previous.doc, ...previous.future].slice(0, HISTORY_LIMIT),
-      }
-    })
-  }
-
-  const redo = () => {
-    setState((previous) => {
-      const nextDoc = previous.future[0]
-      if (!nextDoc) return previous
-      return {
-        doc: nextDoc,
-        past: [...previous.past, previous.doc].slice(-HISTORY_LIMIT),
-        future: previous.future.slice(1),
-      }
-    })
-  }
-
-  return { state, update, reset, replace, undo, redo }
-}
-
 function toastClass(kind: Toast['kind']): string {
   return kind === 'error' ? 'banner danger' : 'banner success'
 }
@@ -199,13 +150,33 @@ export function SchemaEditor({
   projectImports = EMPTY_PROJECT_IMPORTS,
 }: SchemaEditorProps) {
   const builtin = useMemo(() => builtinBundle(), [])
-  const { state, update, reset, replace, undo, redo } = useHistory(initialDoc)
+  const history = useDocumentHistory<SchemaBundle, SchemaSelection>(
+    initialDoc,
+    initialSchemaSelection(initialDoc, builtin),
+    cloneJson,
+  )
+  const doc = history.doc
+  const { commit, reset, replace, undo, redo } = history
+  useShellHistory(client, { canWrite, undo, redo })
+  const selectionState = history.selection
+  const selection = selectionState.target
+  const selectedFieldName = selectionState.field
+  const selectedEventName = selectionState.event
+  const selectedPayloadFieldName = selectionState.payloadField
+  const setSelection = (target: Selection) => {
+    history.updateSelection((current) => ({ ...current, target }))
+  }
+  const setSelectedFieldName = (name: string | null) => {
+    history.updateSelection((current) => ({ ...current, field: name }))
+  }
+  const setSelectedEventName = (name: string | null) => {
+    history.updateSelection((current) => ({ ...current, event: name }))
+  }
+  const setSelectedPayloadFieldName = (name: string | null) => {
+    history.updateSelection((current) => ({ ...current, payloadField: name }))
+  }
   const [savedText, setSavedText] = useState(() => schemaToText(initialDoc))
-  const [selection, setSelection] = useState<Selection>(() => initialSelection(initialDoc, builtin))
   const [tab, setTab] = useState<DetailTab>('fields')
-  const [selectedFieldName, setSelectedFieldName] = useState<string | null>(null)
-  const [selectedEventName, setSelectedEventName] = useState<string | null>(null)
-  const [selectedPayloadFieldName, setSelectedPayloadFieldName] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [newDefinitionName, setNewDefinitionName] = useState<string | null>(null)
   const [newFieldName, setNewFieldName] = useState<string | null>(null)
@@ -222,51 +193,51 @@ export function SchemaEditor({
   const searchRef = useRef<HTMLInputElement>(null)
   const pathRef = useRef(client.file.path)
   const pendingSaveRef = useRef<string | null>(null)
-  const docRef = useRef(state.doc)
+  const docRef = useRef(doc)
   const dirtyRef = useRef(false)
 
-  const serialized = schemaToText(state.doc)
+  const serialized = schemaToText(doc)
   const dirty = serialized !== savedText
-  docRef.current = state.doc
+  docRef.current = doc
   dirtyRef.current = dirty
 
   const resolvedPackages = useMemo(
-    () => resolveSchemaImports(state.doc, packages, projectImports),
-    [state.doc, packages, projectImports],
+    () => resolveSchemaImports(doc, packages, projectImports),
+    [doc, packages, projectImports],
   )
   const importBundles = resolvedPackages.bundles
   const directImportBundles = useMemo(() => {
     const direct: Record<string, SchemaBundle> = {}
-    for (const namespace of Object.keys(state.doc.imports ?? {})) {
+    for (const namespace of Object.keys(doc.imports ?? {})) {
       if (importBundles[namespace]) direct[namespace] = importBundles[namespace]
     }
     return direct
-  }, [state.doc.imports, importBundles])
+  }, [doc.imports, importBundles])
   const enumOptions = useMemo(() => {
-    const options: Record<string, SchemaEnum> = { ...(state.doc.enums ?? {}) }
+    const options: Record<string, SchemaEnum> = { ...(doc.enums ?? {}) }
     for (const [namespace, imported] of Object.entries(directImportBundles)) {
       for (const [name, enumDef] of Object.entries(imported.enums ?? {})) {
         options[`${namespace}:${name}`] = enumDef
       }
     }
     return options
-  }, [state.doc.enums, directImportBundles])
+  }, [doc.enums, directImportBundles])
   const firstEnumKey = useMemo(
     () => Object.keys(enumOptions).sort((a, b) => a.localeCompare(b))[0],
     [enumOptions],
   )
   const declaredImportPaths = useMemo(() => {
     const paths = new Set<string>()
-    for (const namespace of Object.keys(state.doc.imports ?? {})) {
+    for (const namespace of Object.keys(doc.imports ?? {})) {
       const location = projectImports[namespace]
       if (!location) continue
       paths.add(/^https?:\/\//.test(location) ? location : normalizeSchemaPath(location))
     }
     return paths
-  }, [state.doc.imports, projectImports])
+  }, [doc.imports, projectImports])
 
   const validation = useMemo(() => {
-    const result = validateSchema(state.doc, builtin, importBundles)
+    const result = validateSchema(doc, builtin, importBundles)
     const extra: ValidationIssue[] = [
       ...resolvedPackages.issues,
       ...packageIssues
@@ -288,7 +259,7 @@ export function SchemaEditor({
       warnings: issues.filter((issue) => issue.severity === 'warning').length,
     }
   }, [
-    state.doc,
+    doc,
     builtin,
     importBundles,
     resolvedPackages.issues,
@@ -298,40 +269,40 @@ export function SchemaEditor({
   const selectedDefinitionId = selection?.kind === 'definition' ? selection.id : null
   const selectedEnumName = selection?.kind === 'enum' ? selection.name : null
   const selectedLookup = selectedDefinitionId
-    ? lookupDefinition(selectedDefinitionId, state.doc, builtin, importBundles)
+    ? lookupDefinition(selectedDefinitionId, doc, builtin, importBundles)
     : null
   const selectedDefinition = selectedLookup?.definition ?? null
   const selectedIsBuiltin = selectedLookup?.source === 'builtin'
   const selectedIsImported = selectedDefinitionId
-    ? isImportedDefinition(selectedDefinitionId, state.doc, builtin, importBundles)
+    ? isImportedDefinition(selectedDefinitionId, doc, builtin, importBundles)
     : false
   const selectedEffective = useMemo(
     () => (
       selectedDefinitionId
-        ? effectiveDefinition(selectedDefinitionId, state.doc, builtin, importBundles)
+        ? effectiveDefinition(selectedDefinitionId, doc, builtin, importBundles)
         : null
     ),
-    [selectedDefinitionId, state.doc, builtin, importBundles],
+    [selectedDefinitionId, doc, builtin, importBundles],
   )
-  const selectedEnum = selectedEnumName ? state.doc.enums?.[selectedEnumName] : undefined
-  const selectedIsOwn = Boolean(selectedDefinitionId && state.doc.definitions[selectedDefinitionId])
+  const selectedEnum = selectedEnumName ? doc.enums?.[selectedEnumName] : undefined
+  const selectedIsOwn = Boolean(selectedDefinitionId && doc.definitions[selectedDefinitionId])
   const editable = canWrite && selectedIsOwn && !selectedIsBuiltin
 
   useEffect(() => {
     if (!selection) return
     if (selection.kind === 'definition') {
-      if (!lookupDefinition(selection.id, state.doc, builtin, importBundles)) {
-        setSelection(initialSelection(state.doc, builtin))
+      if (!lookupDefinition(selection.id, doc, builtin, importBundles)) {
+        setSelection(initialSelection(doc, builtin))
         setSelectedFieldName(null)
         setSelectedEventName(null)
         setSelectedPayloadFieldName(null)
       }
       return
     }
-    if (!state.doc.enums?.[selection.name]) {
-      setSelection(initialSelection(state.doc, builtin))
+    if (!doc.enums?.[selection.name]) {
+      setSelection(initialSelection(doc, builtin))
     }
-  }, [state.doc, selection, builtin, importBundles])
+  }, [doc, selection, builtin, importBundles])
 
   useEffect(() => {
     client.setDirty(dirty)
@@ -362,7 +333,7 @@ export function SchemaEditor({
     try {
       const text = await client.readFile(pathRef.current, 'utf8')
       const next = parseSchemaText(text.text)
-      reset(next)
+      reset(next, initialSchemaSelection(next, builtin))
       setSavedText(schemaToText(next))
       setSelection(initialSelection(next, builtin))
       setSelectedFieldName(null)
@@ -436,10 +407,25 @@ export function SchemaEditor({
         client.requestSave()
         return
       }
-      if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+      if (
+        !editing &&
+        canWrite &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 'z'
+      ) {
         event.preventDefault()
         if (event.shiftKey) redo()
         else undo()
+        return
+      }
+      if (
+        !editing &&
+        canWrite &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 'y'
+      ) {
+        event.preventDefault()
+        redo()
         return
       }
       if (editing) return
@@ -467,7 +453,7 @@ export function SchemaEditor({
       if (!canWrite) return
       if (event.key.toLowerCase() === 'n') {
         event.preventDefault()
-        setNewDefinitionName(uniqueLocalName(state.doc))
+        setNewDefinitionName(uniqueLocalName(doc))
       }
       if (event.key.toLowerCase() === 'f' && selectedDefinitionId) {
         event.preventDefault()
@@ -486,7 +472,7 @@ export function SchemaEditor({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [canWrite, selectedDefinitionId, state.doc, client, redo, undo])
+  }, [canWrite, selectedDefinitionId, doc, client, redo, undo])
 
   const selectDefinition = (id: string) => {
     setSelection({ kind: 'definition', id })
@@ -503,7 +489,7 @@ export function SchemaEditor({
   }
 
   const updateDefinition = (id: string, recipe: (definition: SchemaDefinition) => void) => {
-    update((doc) => {
+    commit((doc) => {
       const definition = doc.definitions[id]
       if (!definition) throw new Error(`Definition "${id}" no longer exists.`)
       recipe(definition)
@@ -513,7 +499,7 @@ export function SchemaEditor({
   const renameBundleNamespace = (namespace: string) => {
     if (!canWrite) return
     const clean = namespace.trim()
-    if (!clean || clean === state.doc.namespace) return
+    if (!clean || clean === doc.namespace) return
     if (clean === builtin.namespace) {
       showError(`Namespace "${clean}" is reserved for the builtin schema.`)
       return
@@ -522,7 +508,7 @@ export function SchemaEditor({
       ? definitionLocalName(selectedDefinitionId)
       : null
     try {
-      const next = renameNamespaceInBundle(state.doc, clean)
+      const next = renameNamespaceInBundle(doc, clean)
       replace(next)
       if (localSelection && next.definitions[qualify(clean, localSelection)]) {
         setSelection({ kind: 'definition', id: qualify(clean, localSelection) })
@@ -536,7 +522,7 @@ export function SchemaEditor({
   const addSchemaImport = (namespace: string, version: string) => {
     if (!canWrite) return
     try {
-      const next = addImportToBundle(state.doc, namespace, version)
+      const next = addImportToBundle(doc, namespace, version)
       replace(next)
       showNotice(`Imported ${namespace}@${version}.`)
     } catch (error) {
@@ -546,12 +532,12 @@ export function SchemaEditor({
 
   const removeSchemaImport = (namespace: string) => {
     if (!canWrite) return
-    const uses = importUsageCount(state.doc, namespace)
+    const uses = importUsageCount(doc, namespace)
     const message = uses > 0
       ? `Remove the import "${namespace}"? ${uses} reference(s) in this bundle will become invalid.`
       : `Remove the import "${namespace}"?`
     if (!window.confirm(message)) return
-    replace(removeImportFromBundle(state.doc, namespace))
+    replace(removeImportFromBundle(doc, namespace))
   }
 
   const renameSelectedDefinition = (localName: string) => {
@@ -561,10 +547,10 @@ export function SchemaEditor({
       showError('Definition name cannot be empty.')
       return
     }
-    const nextId = qualify(state.doc.namespace, clean)
+    const nextId = qualify(doc.namespace, clean)
     if (nextId === selectedDefinitionId) return
     try {
-      const next = renameDefinitionInBundle(state.doc, selectedDefinitionId, nextId)
+      const next = renameDefinitionInBundle(doc, selectedDefinitionId, nextId)
       replace(next)
       setSelection({ kind: 'definition', id: nextId })
     } catch (error) {
@@ -574,12 +560,12 @@ export function SchemaEditor({
 
   const deleteSelectedDefinition = () => {
     if (!selectedDefinitionId || !editable) return
-    const uses = usageCount(state.doc, selectedDefinitionId)
+    const uses = usageCount(doc, selectedDefinitionId)
     const message = uses > 0
       ? `Delete "${selectedDefinitionId}"? ${uses} composition reference(s) in this bundle will be removed.`
       : `Delete "${selectedDefinitionId}"?`
     if (!window.confirm(message)) return
-    const next = deleteDefinitionInBundle(state.doc, selectedDefinitionId)
+    const next = deleteDefinitionInBundle(doc, selectedDefinitionId)
     replace(next)
     setSelection(initialSelection(next, builtin))
     setSelectedFieldName(null)
@@ -698,11 +684,11 @@ export function SchemaEditor({
       showError('Enum name cannot be empty.')
       return
     }
-    if (state.doc.enums?.[name]) {
+    if (doc.enums?.[name]) {
       showError(`Enum "${name}" already exists.`)
       return
     }
-    update((doc) => {
+    commit((doc) => {
       doc.enums = doc.enums ?? {}
       doc.enums[name] = { values: [] }
     })
@@ -743,13 +729,13 @@ export function SchemaEditor({
     ? lookupFieldEnum(
         selectedFieldEffective.field,
         selectedFieldEffective.origin,
-        state.doc,
+        doc,
         builtin,
         importBundles,
       )
     : null
   const selectedPayloadEnum = selectedPayloadField && selectedDefinitionId
-    ? lookupFieldEnum(selectedPayloadField, selectedDefinitionId, state.doc, builtin, importBundles)
+    ? lookupFieldEnum(selectedPayloadField, selectedDefinitionId, doc, builtin, importBundles)
     : null
   const selectedFieldEnums = selectedFieldEnum
     ? { ...enumOptions, [selectedFieldEnum.key]: selectedFieldEnum.enumDef }
@@ -797,16 +783,16 @@ export function SchemaEditor({
 
   const definitionEntries = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return Object.entries(state.doc.definitions)
+    return Object.entries(doc.definitions)
       .filter(([id]) => {
         if (!query) return true
         if (id.toLowerCase().includes(query)) return true
-        return Object.keys(state.doc.definitions[id].fields ?? {}).some((field) =>
+        return Object.keys(doc.definitions[id].fields ?? {}).some((field) =>
           field.toLowerCase().includes(query),
         )
       })
       .sort(([a], [b]) => a.localeCompare(b))
-  }, [state.doc, search])
+  }, [doc, search])
 
   const builtinEntries = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -817,7 +803,7 @@ export function SchemaEditor({
 
   const importEntries = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return Object.entries(state.doc.imports ?? {})
+    return Object.entries(doc.imports ?? {})
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([namespace, version]) => {
         const imported = importBundles[namespace]
@@ -826,11 +812,11 @@ export function SchemaEditor({
           .sort(([a], [b]) => a.localeCompare(b))
         return { namespace, version, imported, definitions }
       })
-  }, [state.doc.imports, importBundles, search])
+  }, [doc.imports, importBundles, search])
 
   const importCandidates = useMemo(() => {
-    const own = state.doc.namespace
-    const declared = state.doc.imports ?? {}
+    const own = doc.namespace
+    const declared = doc.imports ?? {}
     return packages
       .filter((item) => item.bundle.namespace !== own)
       .filter((item) => item.bundle.namespace !== builtin.namespace)
@@ -840,17 +826,17 @@ export function SchemaEditor({
         if (byNamespace !== 0) return byNamespace
         return a.bundle.version.localeCompare(b.bundle.version)
       })
-  }, [packages, state.doc.namespace, state.doc.imports, builtin.namespace])
+  }, [packages, doc.namespace, doc.imports, builtin.namespace])
 
   const abstractEntries = definitionEntries.filter(([, definition]) => definition.abstract)
   const concreteEntries = definitionEntries.filter(([, definition]) => !definition.abstract)
-  const enumNames = Object.keys(state.doc.enums ?? {}).sort((a, b) => a.localeCompare(b))
-  const definitionCount = Object.keys(state.doc.definitions).length
+  const enumNames = Object.keys(doc.enums ?? {}).sort((a, b) => a.localeCompare(b))
+  const definitionCount = Object.keys(doc.definitions).length
   const currentDirtyLabel = dirty ? 'Unsaved changes' : 'Up to date'
 
   const inheritedOverride = (field: SchemaField, origin: string): SchemaField => {
     const override = { ...field }
-    const lookup = lookupFieldEnum(field, origin, state.doc, builtin, importBundles)
+    const lookup = lookupFieldEnum(field, origin, doc, builtin, importBundles)
     if (lookup) override.enum = lookup.key
     return override
   }
@@ -1068,7 +1054,7 @@ export function SchemaEditor({
     const clean = name.trim()
     if (!clean || clean === selectedEnumName) return
     try {
-      const next = renameEnumInBundle(state.doc, selectedEnumName, clean)
+      const next = renameEnumInBundle(doc, selectedEnumName, clean)
       replace(next)
       selectEnum(clean)
     } catch (error) {
@@ -1080,11 +1066,11 @@ export function SchemaEditor({
     if (!selectedEnumName || newEnumValue === null || !canWrite) return
     const value = newEnumValue.trim()
     if (!value) return
-    if (state.doc.enums?.[selectedEnumName]?.values.includes(value)) {
+    if (doc.enums?.[selectedEnumName]?.values.includes(value)) {
       showError(`Enum value "${value}" already exists.`)
       return
     }
-    update((doc) => {
+    commit((doc) => {
       const enumDef = doc.enums?.[selectedEnumName]
       if (!enumDef) return
       enumDef.values.push(value)
@@ -1097,7 +1083,7 @@ export function SchemaEditor({
     const clean = newValue.trim()
     if (!clean || clean === oldValue) return
     try {
-      const next = renameEnumValueInBundle(state.doc, selectedEnumName, oldValue, clean)
+      const next = renameEnumValueInBundle(doc, selectedEnumName, oldValue, clean)
       replace(next)
     } catch (error) {
       showError(error)
@@ -1106,7 +1092,7 @@ export function SchemaEditor({
 
   const deleteEnumValue = (value: string) => {
     if (!selectedEnumName || !canWrite) return
-    update((doc) => {
+    commit((doc) => {
       const enumDef = doc.enums?.[selectedEnumName]
       if (!enumDef) return
       enumDef.values = enumDef.values.filter((item) => item !== value)
@@ -1115,13 +1101,13 @@ export function SchemaEditor({
 
   const deleteSelectedEnum = () => {
     if (!selectedEnumName || !canWrite) return
-    if (enumUsageCount(state.doc, selectedEnumName) > 0) {
+    if (enumUsageCount(doc, selectedEnumName) > 0) {
       showError('This enum is still used by a field. Change those fields first.')
       return
     }
     if (!window.confirm(`Delete enum "${selectedEnumName}"?`)) return
     try {
-      const next = deleteEnumInBundle(state.doc, selectedEnumName)
+      const next = deleteEnumInBundle(doc, selectedEnumName)
       replace(next)
       setSelection(initialSelection(next, builtin))
       setSelectedFieldName(null)
@@ -1134,7 +1120,7 @@ export function SchemaEditor({
   const createDefinition = () => {
     if (newDefinitionName === null || !canWrite) return
     try {
-      const result = addDefinition(state.doc, newDefinitionName, false)
+      const result = addDefinition(doc, newDefinitionName, false)
       replace(result.bundle)
       setSelection({ kind: 'definition', id: result.id })
       setNewDefinitionName(null)
@@ -1312,7 +1298,7 @@ export function SchemaEditor({
             >
               <span className="enum-icon" aria-hidden="true">◇</span>
               <span className="nav-label">{name}</span>
-              <span className="nav-count">{state.doc.enums?.[name]?.values?.length ?? 0}</span>
+              <span className="nav-count">{doc.enums?.[name]?.values?.length ?? 0}</span>
             </button>
           ))}
           {canWrite && newEnumName === null && (
@@ -1354,7 +1340,7 @@ export function SchemaEditor({
           <div className="inspector-empty">
             <p className="eyebrow">Enum</p>
             <h3>{selectedEnumName}</h3>
-            <p className="muted-copy">{enumUsageCount(state.doc, selectedEnumName)} field references in this bundle.</p>
+            <p className="muted-copy">{enumUsageCount(doc, selectedEnumName)} field references in this bundle.</p>
             {enumIssues.length > 0 && (
               <div className="issue-stack">
                 {enumIssues.map((issue, index) => (
@@ -1530,29 +1516,37 @@ export function SchemaEditor({
         <div className="identity-block">
           <div className="identity-mark" aria-hidden="true">T</div>
           <div className="identity-fields">
-            <input
+            <CommitInput
               className="identity-id"
-              value={state.doc.id}
+              value={doc.id}
               disabled={!canWrite}
-              aria-label="Schema bundle ID"
-              onChange={(event) => update((doc) => { doc.id = event.target.value })}
+              ariaLabel="Schema bundle ID"
+              onCommit={(value) => {
+                if (value !== doc.id) {
+                  commit((draft) => { draft.id = value })
+                }
+              }}
             />
             <div className="identity-meta">
               <CommitInput
                 className="identity-meta-input"
-                value={state.doc.namespace}
+                value={doc.namespace}
                 disabled={!canWrite}
                 title="Changing the namespace rewrites this bundle's definition IDs."
                 ariaLabel="Schema namespace"
                 onCommit={renameBundleNamespace}
               />
               <span className="meta-separator">@</span>
-              <input
+              <CommitInput
                 className="identity-meta-input"
-                value={state.doc.version}
+                value={doc.version}
                 disabled={!canWrite}
-                aria-label="Schema version"
-                onChange={(event) => update((doc) => { doc.version = event.target.value })}
+                ariaLabel="Schema version"
+                onCommit={(value) => {
+                  if (value !== doc.version) {
+                    commit((draft) => { draft.version = value })
+                  }
+                }}
               />
             </div>
           </div>
@@ -1560,6 +1554,24 @@ export function SchemaEditor({
         </div>
         <div className="header-actions">
           {!canWrite && <span className="badge readonly">read-only</span>}
+          <button
+            type="button"
+            className="button tiny ghost"
+            disabled={!canWrite || !history.canUndo}
+            onClick={undo}
+            title="Undo (Ctrl/Cmd+Z)"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            className="button tiny ghost"
+            disabled={!canWrite || !history.canRedo}
+            onClick={redo}
+            title="Redo (Shift+Ctrl/Cmd+Z or Ctrl/Cmd+Y)"
+          >
+            Redo
+          </button>
           <span className={`save-state ${dirty ? 'dirty' : 'clean'}`}>{currentDirtyLabel}</span>
           <button
             type="button"
@@ -1613,7 +1625,7 @@ export function SchemaEditor({
               setNewValue={setNewEnumValue}
               commitNewValue={addEnumValue}
               onMoveValue={(direction, value) => {
-                update((doc) => {
+                commit((doc) => {
                   const enumDef = doc.enums?.[selectedEnumName]
                   if (!enumDef) return
                   const index = enumDef.values.indexOf(value)
@@ -1655,8 +1667,8 @@ export function SchemaEditor({
               }}
               selectPayloadField={(name) => setSelectedPayloadFieldName(name)}
               enums={enumOptions}
-              allIds={allDefinitionIds(state.doc, builtin, directImportBundles)}
-              bundle={state.doc}
+              allIds={allDefinitionIds(doc, builtin, directImportBundles)}
+              bundle={doc}
               builtinBundle={builtin}
               importedBundles={importBundles}
               onRenameDefinition={renameSelectedDefinition}
@@ -1704,7 +1716,7 @@ export function SchemaEditor({
             <span className="status-separator">·</span>
             {validation.warnings} {validation.warnings === 1 ? 'warning' : 'warnings'}
           </button>
-          <span className="status-schema">{state.doc.namespace}@{state.doc.version}</span>
+          <span className="status-schema">{doc.namespace}@{doc.version}</span>
         </div>
         <div className="status-right">
           <span>{canWrite ? 'Ctrl/Cmd+S saves' : 'Read-only workspace'}</span>

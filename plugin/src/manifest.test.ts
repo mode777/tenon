@@ -31,7 +31,7 @@ function manifest(): Manifest {
 describe('Tenon manifest', () => {
   it('declares the hierarchy primary panel and binds it to scene/level editors', () => {
     const value = manifest()
-    expect(value.version).toBe('0.5.0')
+    expect(value.version).toBe('0.6.0')
     expect(value.engines.exo).toBe('>=0.11.0')
 
     const hierarchy = value.contributes.panels.find(

@@ -1,6 +1,6 @@
 # Change: Unified editor undo/redo
 
-Status: ready
+Status: doing
 Created: 2026-11-28
 
 ## 1. Proposal
@@ -162,29 +162,29 @@ None.
 
 ## 6. Acceptance Criteria & Validation
 
-- [ ] AC1 `HISTORY-SHARED`: project, schema, and scene editors use one history implementation
+- [x] AC1 `HISTORY-SHARED`: project, schema, and scene editors use one history implementation
   with independent stacks — validate:
   `cd plugin && npx vitest run src/core/history.test.tsx src/project-editor/ProjectEditor.test.tsx src/schema/SchemaEditor.test.tsx src/scene/SceneEditor.test.tsx`.
-- [ ] AC2 `HISTORY-SHELL`: simulated `shell/undo` and `shell/redo` intents change the active
+- [x] AC2 `HISTORY-SHELL`: simulated `shell/undo` and `shell/redo` intents change the active
   writable document and report dirty without save — validate: editor tests with a mock client.
-- [ ] AC3 `HISTORY-FALLBACK`: frame Undo/Redo buttons and shortcuts work when no intent is
+- [x] AC3 `HISTORY-FALLBACK`: frame Undo/Redo buttons and shortcuts work when no intent is
   delivered — validate: editor tests without shell intent calls.
-- [ ] AC4 `HISTORY-GRANULARITY`: one completed text edit, one drag, and one command each undo
+- [x] AC4 `HISTORY-GRANULARITY`: one completed text edit, one drag, and one command each undo
   in one step — validate: history and editor tests.
-- [ ] AC5 `HISTORY-SELECTION`: undo after delete/duplicate/create restores the associated
+- [x] AC5 `HISTORY-SELECTION`: undo after delete/duplicate/create restores the associated
   selection; transient state is unchanged — validate: scene and schema editor tests.
 - [ ] AC6 `HISTORY-CONTROLS`: every frame shows disabled-state Undo/Redo controls and handles
   all three shortcuts outside text inputs — validate: editor tests; manual keyboard check.
-- [ ] AC7 `HISTORY-DIRTY`: undo to saved text clears dirty; redo marks dirty again — validate:
+- [x] AC7 `HISTORY-DIRTY`: undo to saved text clears dirty; redo marks dirty again — validate:
   editor tests asserting `setDirty` calls.
-- [ ] AC8 `HISTORY-RELOAD`: reload clears history — validate: editor tests.
-- [ ] AC9 `HISTORY-SAVE`: save retains history and updates the baseline — validate: editor tests.
-- [ ] AC10 `PROJECT-UNDO`: import-map add, change, and remove each undo and redo — validate:
+- [x] AC8 `HISTORY-RELOAD`: reload clears history — validate: editor tests.
+- [x] AC9 `HISTORY-SAVE`: save retains history and updates the baseline — validate: editor tests.
+- [x] AC10 `PROJECT-UNDO`: import-map add, change, and remove each undo and redo — validate:
   `ProjectEditor.test.tsx`.
-- [ ] AC11 SDK and compatibility: vendored SDK is `1.11.0`, plugin depends on it, manifest
+- [x] AC11 SDK and compatibility: vendored SDK is `1.11.0`, plugin depends on it, manifest
   stays `>=0.11.0` — validate: `npm test --workspace sdk`,
   `npm run typecheck --workspace sdk`, and version assertions.
-- [ ] AC12 Ship gate: `npm test`, `npm run typecheck`, and `npm run build` pass — validate:
+- [x] AC12 Ship gate: `npm test`, `npm run typecheck`, and `npm run build` pass — validate:
   run all three from the repository root.
 - [ ] AC13 Shell integration: on Exo 0.13.0+, Edit > Undo/Redo and the palette change the
   active Tenon document — validate: manual check in the hosted shell after deployment.
@@ -214,58 +214,58 @@ No open questions.
 
 ## 8. Implementation Plan
 
-- [ ] T1 Copy the upstream `@exo/plugin-sdk` `1.11.0` package over `sdk/` and update the plugin
+- [x] T1 Copy the upstream `@exo/plugin-sdk` `1.11.0` package over `sdk/` and update the plugin
   dependency — files: `sdk/`, `plugin/package.json`, `package-lock.json` — verify:
   `npm test --workspace sdk`, `npm run typecheck --workspace sdk`, and confirm `SDK_VERSION`
   is `1.11.0`.
-- [ ] T2 Add `useDocumentHistory` with document-plus-selection entries, `select`, commit
+- [x] T2 Add `useDocumentHistory` with document-plus-selection entries, `select`, commit
   boundaries, coalescing, stable callbacks, and unit tests; keep `useHistory` temporarily —
   files: `plugin/src/core/history.ts`, `plugin/src/core/history.test.tsx` — verify:
   `cd plugin && npx vitest run src/core/history.test.tsx`.
-- [ ] T3 Add the shared shell history adapter hook and its tests — files:
+- [x] T3 Add the shared shell history adapter hook and its tests — files:
   `plugin/src/core/useShellHistory.ts`, `plugin/src/core/useShellHistory.test.tsx` — verify:
   `cd plugin && npx vitest run src/core/useShellHistory.test.tsx`.
-- [ ] T4 Migrate the project editor's document history to `useDocumentHistory` and capture no
+- [x] T4 Migrate the project editor's document history to `useDocumentHistory` and capture no
   selection — files: `plugin/src/project-editor/ProjectEditor.tsx`,
   `plugin/src/project-editor/ProjectEditor.test.tsx` — verify:
   `cd plugin && npx vitest run src/project-editor/ProjectEditor.test.tsx`.
-- [ ] T5 Commit project import-map paths on blur/Enter and add Undo/Redo toolbar controls,
+- [x] T5 Commit project import-map paths on blur/Enter and add Undo/Redo toolbar controls,
   shortcuts, and shell intents — files:
   `plugin/src/project-editor/ProjectEditor.tsx`,
   `plugin/src/project-editor/ProjectEditor.test.tsx`, `plugin/src/project-editor/project-editor.css`
   — verify: `cd plugin && npx vitest run src/project-editor/ProjectEditor.test.tsx`.
-- [ ] T6 Replace the schema editor's duplicate history with `useDocumentHistory` and capture
+- [x] T6 Replace the schema editor's duplicate history with `useDocumentHistory` and capture
   definition, field, event, payload-field, and enum selection — files:
   `plugin/src/schema/SchemaEditor.tsx`, `plugin/src/schema/SchemaEditor.test.tsx` — verify:
   `cd plugin && npx vitest run src/schema/SchemaEditor.test.tsx`.
-- [ ] T7 Commit schema identity fields on blur/Enter and add Undo/Redo toolbar controls,
+- [x] T7 Commit schema identity fields on blur/Enter and add Undo/Redo toolbar controls,
   Ctrl/Cmd+Y, and shell intents — files: `plugin/src/schema/SchemaEditor.tsx`,
   `plugin/src/schema/Inputs.tsx`, `plugin/src/schema/SchemaEditor.test.tsx`,
   `plugin/src/schema/schema.css` — verify:
   `cd plugin && npx vitest run src/schema/SchemaEditor.test.tsx`.
-- [ ] T8 Migrate the scene editor history to document-plus-selection entries and route every
+- [x] T8 Migrate the scene editor history to document-plus-selection entries and route every
   command and viewport transform through the same commit path — files:
   `plugin/src/scene/SceneEditor.tsx`, `plugin/src/scene/scene-commands.ts`,
   `plugin/src/scene/SceneEditor.test.tsx` — verify:
   `cd plugin && npx vitest run src/scene/SceneEditor.test.tsx`.
-- [ ] T9 Add scene Undo/Redo shell intents and verify toolbar, keyboard, and panel-originated
+- [x] T9 Add scene Undo/Redo shell intents and verify toolbar, keyboard, and panel-originated
   undo/redo — files: `plugin/src/scene/SceneEditor.tsx`,
   `plugin/src/scene/useScenePanelBridge.ts`, `plugin/src/scene/SceneEditor.test.tsx`,
   `plugin/src/scene/panels/panel-bridge.test.tsx` — verify:
   `cd plugin && npx vitest run src/scene/SceneEditor.test.tsx src/scene/panels/panel-bridge.test.tsx`.
-- [ ] T10 Make scene-panel text and number edits commit at logical boundaries while keeping
+- [x] T10 Make scene-panel text and number edits commit at logical boundaries while keeping
   panel commands on the editor history path — files:
   `plugin/src/scene/panels/InspectorPanel.tsx`, `plugin/src/scene/panels/InspectorPanel.test.tsx`
   — verify: `cd plugin && npx vitest run src/scene/panels/InspectorPanel.test.tsx`.
-- [ ] T11 Remove the superseded `useHistory` API and update remaining imports — files:
+- [x] T11 Remove the superseded `useHistory` API and update remaining imports — files:
   `plugin/src/core/history.ts`, `plugin/src/core/history.test.tsx`, and any remaining editor
   imports — verify: `npm run typecheck`.
-- [ ] T12 Update the design docs and decision record — files:
+- [x] T12 Update the design docs and decision record — files:
   `docs/technical-decisions.md` (TD-15, TD-26, new TD-32),
   `docs/schema-editor-ui.md`, `docs/scene-editor-ui.md`, `README.md` — verify: grep for stale
   command-pattern wording and re-read the keyboard/toolbar sections.
-- [ ] T13 Bump the plugin version to `0.6.0` and keep the manifest engine range at
+- [x] T13 Bump the plugin version to `0.6.0` and keep the manifest engine range at
   `>=0.11.0` — files: `plugin/package.json`, `plugin/public/exo-manifest.json`,
   `package-lock.json` — verify: `npm run build` and inspect the manifest versions.
-- [ ] T14 Run the full ship gate and a fresh-context review of the diff — files: none —
+- [x] T14 Run the full ship gate and a fresh-context review of the diff — files: none —
   verify: `npm test`, `npm run typecheck`, `npm run build`, `npm test --workspace sdk`.

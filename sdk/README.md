@@ -52,6 +52,12 @@ let buffer = ''
 
 editor.onSaveRequest(() => ({ text: buffer }))
 editor.requestSave() // id-less intent; outcome arrives through onSaveResult
+editor.onUndoRequest(() => {
+  // Apply undo through your own history, then report the resulting dirty state.
+})
+editor.onRedoRequest(() => {
+  // Apply redo through your own history, then report the resulting dirty state.
+})
 editor.onFileChanged((change) => console.log(change.kind, change.path))
 editor.onDispose((reason) => console.log('disposed', reason))
 
@@ -59,6 +65,11 @@ const content = await editor.readFile(editor.file.path, 'utf8')
 buffer = content.text
 editor.setDirty(true)
 ```
+
+The shell sends `shell/undo` and `shell/redo` as id-less intents. The plugin owns
+its history and reports the resulting dirty state; the SDK sends nothing back.
+A visible editor should also bind the same keys inside its own frame, because
+keyboard events there do not reach the shell.
 
 The SDK sends `plugin/dispose-ack` automatically, rejects pending reads on
 disposal and answers `shell/request-save` only when a save handler is registered.

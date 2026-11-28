@@ -2,7 +2,8 @@ import type { EditorClient } from '@exo/plugin-sdk'
 import { ExoProtocolError, type FileChangedPayload } from '@exo/plugin-sdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { builtinBundle, type ValidationIssue } from '../core/schema'
-import { useHistory } from '../core/history'
+import { useDocumentHistory } from '../core/history'
+import { useShellHistory } from '../core/useShellHistory'
 import {
   analyzeProject,
   parseProjectText,
@@ -44,6 +45,65 @@ function issueTarget(issue: ValidationIssue): string | null {
   return null
 }
 
+function cloneManifest(manifest: ProjectManifest): ProjectManifest {
+  return JSON.parse(JSON.stringify(manifest)) as ProjectManifest
+}
+
+function LocationInput({
+  namespace,
+  value,
+  disabled,
+  onCommit,
+}: {
+  namespace: string
+  value: string
+  disabled: boolean
+  onCommit: (value: string) => void
+}) {
+  const [draft, setDraft] = useState(value)
+  const focused = useRef(false)
+  const cancelled = useRef(false)
+
+  useEffect(() => {
+    if (!focused.current) setDraft(value)
+  }, [value])
+
+  return (
+    <input
+      type="text"
+      value={draft}
+      aria-label={`Location for ${namespace}`}
+      disabled={disabled}
+      onFocus={() => {
+        focused.current = true
+        cancelled.current = false
+        setDraft(value)
+      }}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => {
+        focused.current = false
+        if (cancelled.current) {
+          cancelled.current = false
+          setDraft(value)
+          return
+        }
+        if (draft !== value) onCommit(draft)
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          event.currentTarget.blur()
+        }
+        if (event.key === 'Escape') {
+          cancelled.current = true
+          setDraft(value)
+          event.currentTarget.blur()
+        }
+      }}
+    />
+  )
+}
+
 export function ProjectEditor({
   client,
   initialManifest,
@@ -51,8 +111,9 @@ export function ProjectEditor({
   workspace,
 }: ProjectEditorProps) {
   const builtin = useMemo(() => builtinBundle(), [])
-  const history = useHistory(initialManifest, (value) => JSON.parse(JSON.stringify(value)) as ProjectManifest)
-  const manifest = history.state.doc
+  const history = useDocumentHistory(initialManifest, null, cloneManifest)
+  const manifest = history.doc
+  useShellHistory(client, { canWrite, undo: history.undo, redo: history.redo })
   const [savedText, setSavedText] = useState(() => projectToText(initialManifest))
   const [newNamespace, setNewNamespace] = useState('')
   const [newLocation, setNewLocation] = useState('')
@@ -155,7 +216,7 @@ export function ProjectEditor({
     try {
       const content = await client.readFile(pathRef.current, 'utf8')
       const next = parseProjectText(content.text)
-      history.reset(next)
+      history.reset(next, null)
       setSavedText(projectToText(next))
       setExternal(null)
       setToast('Reloaded project.json')
@@ -169,20 +230,38 @@ export function ProjectEditor({
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
         event.preventDefault()
         client.requestSave()
+        return
+      }
+      const target = event.target as HTMLElement | null
+      const editing =
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.tagName === 'SELECT' ||
+        target?.isContentEditable
+      if (editing || !canWrite) return
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) history.redo()
+        else history.undo()
+        return
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
+        event.preventDefault()
+        history.redo()
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [client])
+  }, [canWrite, client, history.undo, history.redo])
 
   const setLocation = (namespace: string, location: string) => {
-    history.update((draft) => {
+    history.commit((draft) => {
       draft.imports = { ...(draft.imports ?? {}), [namespace]: location }
     })
   }
 
   const removeImport = (namespace: string) => {
-    history.update((draft) => {
+    history.commit((draft) => {
       if (!draft.imports) return
       delete draft.imports[namespace]
     })
@@ -234,6 +313,26 @@ export function ProjectEditor({
             <strong>project.json</strong>
             <span>Tenon project</span>
           </div>
+        </div>
+        <div className="project-editor-history">
+          <button
+            type="button"
+            className="button tiny ghost"
+            disabled={!canWrite || !history.canUndo}
+            onClick={history.undo}
+            title="Undo (Ctrl/Cmd+Z)"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            className="button tiny ghost"
+            disabled={!canWrite || !history.canRedo}
+            onClick={history.redo}
+            title="Redo (Shift+Ctrl/Cmd+Z or Ctrl/Cmd+Y)"
+          >
+            Redo
+          </button>
         </div>
         <div className={`project-editor-readiness ${analysis.ready ? 'ready' : 'blocked'}`}>
           <span className="project-editor-status-dot" />
@@ -287,11 +386,11 @@ export function ProjectEditor({
               Object.entries(imports).map(([namespace, location]) => (
                 <div className="project-editor-import-row" key={namespace}>
                   <code>{namespace}</code>
-                  <input
-                    type="text"
+                  <LocationInput
+                    namespace={namespace}
                     value={location}
                     disabled={!canWrite}
-                    onChange={(event) => setLocation(namespace, event.target.value)}
+                    onCommit={(value) => setLocation(namespace, value)}
                   />
                   <button
                     type="button"

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EditorClient } from '@exo/plugin-sdk'
@@ -65,6 +65,8 @@ function sample(): SchemaBundle {
 function mockClient() {
   const saveHandlers: Array<() => { text: string }> = []
   const dirty: boolean[] = []
+  const undoListeners = new Set<() => void>()
+  const redoListeners = new Set<() => void>()
   let commandHandler: ((invocation: { command: string }) => unknown) | null = null
   const requestNewFile = vi.fn(async () => ({ path: '/schemas/new.schema.json', version: 'v1' }))
   const openFile = vi.fn(async () => ({ ok: true }))
@@ -78,6 +80,18 @@ function mockClient() {
       return () => undefined
     },
     onSaveResult: () => () => undefined,
+    onUndoRequest: (listener: () => void) => {
+      undoListeners.add(listener)
+      return () => {
+        undoListeners.delete(listener)
+      }
+    },
+    onRedoRequest: (listener: () => void) => {
+      redoListeners.add(listener)
+      return () => {
+        redoListeners.delete(listener)
+      }
+    },
     onFileChanged: () => () => undefined,
     onDispose: () => () => undefined,
     onError: () => () => undefined,
@@ -90,7 +104,20 @@ function mockClient() {
     requestSave: () => undefined,
     readFile: async () => ({ path: '/schemas/gameA.schema.json', version: 'v1', text: '' }),
   } as unknown as EditorClient
-  return { client, saveHandlers, dirty, requestNewFile, openFile, getCommandHandler: () => commandHandler }
+  return {
+    client,
+    saveHandlers,
+    dirty,
+    requestNewFile,
+    openFile,
+    getCommandHandler: () => commandHandler,
+    emitUndo: () => {
+      for (const listener of [...undoListeners]) listener()
+    },
+    emitRedo: () => {
+      for (const listener of [...redoListeners]) listener()
+    },
+  }
 }
 
 afterEach(() => {
@@ -204,6 +231,84 @@ describe('SchemaEditor', () => {
     const saved = JSON.parse(saveHandlers[0]().text)
     expect(saved.imports).toEqual({ shared: '1.0.0' })
     expect(screen.getAllByText(/shared@1.0.0/).length).toBeGreaterThan(0)
+  })
+
+  it('restores definition selection after undoing a delete', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const { client } = mockClient()
+    render(<SchemaEditor client={client} initialDoc={sample()} canWrite />)
+
+    await user.click(screen.getByTitle('gameA:elevatorButton'))
+    expect(screen.getByText('gameA:elevatorButton', { selector: '.qualified-id' })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.queryByTitle('gameA:elevatorButton')).toBeFalsy()
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
+    expect(screen.getByText('gameA:elevatorButton', { selector: '.qualified-id' })).toBeTruthy()
+  })
+
+  it('commits schema identity on blur and undoes it in one step', async () => {
+    const user = userEvent.setup()
+    const { client, dirty } = mockClient()
+    render(<SchemaEditor client={client} initialDoc={sample()} canWrite />)
+
+    const id = screen.getByLabelText('Schema bundle ID')
+    await user.clear(id)
+    await user.type(id, 'com.example.other')
+    expect(dirty.at(-1)).toBe(false)
+
+    await user.tab()
+    await waitFor(() => expect(dirty.at(-1)).toBe(true))
+    expect(screen.getByDisplayValue('com.example.other')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getByDisplayValue('com.example.gameA')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeTruthy()
+    await waitFor(() => expect(dirty.at(-1)).toBe(false))
+  })
+
+  it('applies shell undo and redo intents', async () => {
+    const user = userEvent.setup()
+    const { client, emitUndo, emitRedo } = mockClient()
+    render(<SchemaEditor client={client} initialDoc={sample()} canWrite />)
+
+    const id = screen.getByLabelText('Schema bundle ID')
+    await user.clear(id)
+    await user.type(id, 'com.example.other')
+    await user.tab()
+    expect(screen.getByDisplayValue('com.example.other')).toBeTruthy()
+
+    act(() => emitUndo())
+    expect(screen.getByDisplayValue('com.example.gameA')).toBeTruthy()
+
+    act(() => emitRedo())
+    expect(screen.getByDisplayValue('com.example.other')).toBeTruthy()
+  })
+
+  it('handles redo with Ctrl+Y', async () => {
+    const user = userEvent.setup()
+    const { client } = mockClient()
+    render(<SchemaEditor client={client} initialDoc={sample()} canWrite />)
+
+    const id = screen.getByLabelText('Schema bundle ID')
+    await user.clear(id)
+    await user.type(id, 'com.example.other')
+    await user.tab()
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
+    expect(screen.getByDisplayValue('com.example.gameA')).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: 'y', ctrlKey: true })
+    expect(screen.getByDisplayValue('com.example.other')).toBeTruthy()
+  })
+
+  it('disables undo and redo in a read-only workspace', () => {
+    const { client } = mockClient()
+    render(<SchemaEditor client={client} initialDoc={sample()} canWrite={false} />)
+    expect((screen.getByRole('button', { name: 'Undo' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Redo' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('renames the namespace and rewrites definition IDs', async () => {

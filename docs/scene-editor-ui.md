@@ -19,9 +19,11 @@ one scene or level document at a time and adds the 3D viewport.
 ## Scene editor (`scenes/*.scene.json`, `levels/*.scene.json`)
 
 A level is a scene document under `levels/`; it opens in the same editor with a level
-badge and top-level-world behavior. The scene panels require **Exo 0.11.0+** and the
-Tenon SDK 1.10.0 contract. The panels use the active-editor context and bottom location
-introduced in Exo 0.10.0; automatic companion binding arrived in Exo 0.11.0.
+badge and top-level-world behavior. The scene panels require **Exo 0.11.0+** and SDK
+1.10.0+. The panels use the active-editor context and bottom location introduced in Exo
+0.10.0; automatic companion binding arrived in Exo 0.11.0. The shell Undo/Redo menu,
+palette, and shortcut intents require Exo 0.13.0+; the frame keeps its own controls and
+keys as the fallback.
 
 ### Layout
 
@@ -87,8 +89,12 @@ scene frame.
 - Edits the selected entity's local transform. Rotations are Euler XYZ **degrees** in
   authoring JSON; the viewport converts to radians.
 - An omitted transform or component is identity. Transform is never a schema property.
-- Undo/redo is per document. Shell Save, Save All, dirty indicators, and conflict
-  notices are shell-owned; the frame answers save requests and reports dirty honestly.
+- Undo/redo is per document and restores the selection stored with the edit. The frame
+  toolbar, Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z, and Ctrl/Cmd+Y handle a focused frame; Exo's
+  Edit menu, palette, and shortcuts send intents to the active writable frame. Text and
+  number fields commit on blur/Enter; one drag is one history step.
+- Shell Save, Save All, dirty indicators, and conflict notices are shell-owned; the frame
+  answers save requests and reports dirty honestly. Save keeps history; reload clears it.
 
 ### Scene composition
 

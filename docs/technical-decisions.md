@@ -485,8 +485,11 @@ the 3D stack; the generator editor may reuse it for preview:
 - three.js for immediate representation in the scene editor and generator preview.
 - `@react-three/fiber` and `@react-three/drei` for the viewport.
 - `three-mesh-bvh` when picking on complex meshes needs acceleration; the M2 baseline does not require it.
-- Per-document editor state and a command-oriented history hook. `zustand` can be introduced when cross-component viewport state warrants a shared store; M2 keeps document state in the frame.
-- Command pattern for per-document undo/redo.
+- Per-document editor state and a shared snapshot-backed history behind a command-style
+  commit API. `zustand` can be introduced when cross-component viewport state warrants a
+  shared store; M2 keeps document state in the frame.
+- Legal edit boundaries plus selection snapshots for per-document undo/redo. The Exo shell
+  sends undo/redo intents but owns no history (TD-32).
 - Schema-generated inspector panel (TD-31).
 - 3D viewport first; orthographic 2D views later.
 - The entity document is independent of the three.js scene graph. three.js is a projection, not the document.
@@ -743,6 +746,9 @@ The plugin also contributes one project-level panel, three scene panels, and two
 - The shell owns the tab strip, breadcrumbs, Save/Save All, dirty indicators,
   external-change notices, consent, and theme. A Tenon frame owns only its
   document surface and must not recreate shell chrome.
+- The shell sends id-less Undo/Redo intents to the active writable frame; the frame
+  applies them to its own history and reports dirty. Frame controls and shortcuts remain
+  the fallback for older shells (TD-32).
 - The project hub is the only project-level shell panel and is a primary panel. It is
   not document-scoped: it lists schema bundles and hosts the New Schema action. It is not
   a document editor and has no dirty state. The scene hierarchy, inspector, and inspection
@@ -784,10 +790,13 @@ The plugin also contributes one project-level panel, three scene panels, and two
   manifest's 0.11.0 floor also covers it. The command still obeys permission, write, size,
   rate, and shell-dialog checks.
 - The scene hierarchy, inspector, and inspection panels require Exo 0.10.0 or newer for
-  the primary/secondary/bottom locations, `activeEditor`/`editor/active`, and SDK 1.10.0.
+  the primary/secondary/bottom locations, `activeEditor`/`editor/active`, and SDK 1.10.0+.
   Because the scene and level editors bind the panels as automatic companions, the
   manifest declares `>=0.11.0`; an older shell fails closed with `incompatible-engine`
   before parsing the locations or the companion fields.
+- Shell Undo/Redo menu, palette, and shortcut intents arrived in Exo 0.13.0 / SDK 1.11.0.
+  The manifest keeps its 0.11.0 floor because the intents are additive and the frames keep
+  their own controls; the shell surfaces require a 0.13.0+ shell.
 - Builtin `basic3d` bundles are packaged with the plugin, not written into the
   workspace (TD-25). The schema editor exposes them read-only; the engine ships
   the same versions.
@@ -979,5 +988,31 @@ inside the scene editor.
   primary sidebar shows one view at a time, so the hierarchy panel and project hub cannot
   be visible simultaneously.
 - A panel never writes a workspace file. A panel edit is a command to the active editor,
-  which remains the only writer. The panel protocol requires Exo 0.10.0+ and SDK 1.10.0;
+  which remains the only writer. The panel protocol requires Exo 0.10.0+ and SDK 1.10.0+;
   automatic companion binding requires Exo 0.11.0+, which the manifest declares.
+- Panel text and number fields commit on blur/Enter, so one field edit is one undo step.
+  Panel commands still use the editor's history path.
+
+## TD-32 — Editor undo/redo
+
+Undo/redo is per document and plugin-owned. Exo owns the Edit menu, palette commands, and
+shortcuts, but keeps no history, content snapshot, or `canUndo`/`canRedo` tab state. It
+sends id-less `shell/undo` and `shell/redo` intents to the active writable editor handler.
+
+- One `useDocumentHistory` hook in the core stores bounded `{ doc, selection }` snapshots.
+  Every document editor commits through it; new operations become undoable without
+  inverse-command code.
+- Selection-only changes update the present snapshot without adding an entry. Undo/redo
+  restore the selection stored with the entry; transient UI such as search, tabs, mode, and
+  drawers stays outside history.
+- Text and number fields commit on blur/Enter; one drag or discrete command is one entry.
+  Same-key coalescing inside a short window is a fallback for controls that must update
+  live. History is bounded to 100 entries.
+- Every frame exposes Undo/Redo controls and Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z, and Ctrl/Cmd+Y.
+  The shell intent covers the menu, palette, and hidden-handler path; frame keys cover a
+  focused iframe. Older shells without the intents keep the frame controls.
+- Dirty is the serialized-text comparison. A successful save keeps history and updates the
+  saved baseline; an external reload clears history. Undoing back to the saved text reports
+  clean without a write.
+- The vendored SDK is `@exo/plugin-sdk` 1.11.0. The manifest keeps `engines.exo: ">=0.11.0"`
+  because the intents are additive; shell menu/palette undo requires Exo 0.13.0+.
