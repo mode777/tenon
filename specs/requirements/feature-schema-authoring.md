@@ -107,4 +107,4 @@ bundles are read-only.
 - `plugin/src/core/schema.ts`
 - `plugin/src/core/history.ts`
 - `docs/schema-editor-ui.md`
-- `docs/technical-decisions.md` TD-04, TD-05, TD-09, TD-16, TD-24, TD-25, TD-27, TD-28, TD-29
+- `docs/technical-decisions.md` TD-04, TD-05, TD-09, TD-16, TD-24, TD-25, TD-27, TD-28, TD-29, TD-32

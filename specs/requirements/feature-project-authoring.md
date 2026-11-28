@@ -67,6 +67,15 @@ schema namespaces to locations, and the editor resolves and validates the whole 
   Fit: selecting an issue with a source path opens that document.
   Evidence: `plugin/src/project-editor/ProjectEditor.tsx`.
 
+- `PROJECT-UNDO` — Project import-map edits are undoable.
+  The project editor shall undo and redo import-map additions, changes, and removals without
+  sharing history with another frame.
+  Why: `project.json` is authored source data and its edits are as reversible as schema or
+  scene edits.
+  Fit: add, change, and remove an import; each is undone and redone independently.
+  Evidence: `plugin/src/project-editor/ProjectEditor.tsx`,
+  `plugin/src/project-editor/ProjectEditor.test.tsx`, TD-32.
+
 - `PROJECT-ROUNDTRIP` — Save and reload without drift.
   The project editor shall save `project.json` through the shell save handler and reload it
   without losing the import map; dirty, conflict, read-only, and theme behavior shall follow
@@ -82,5 +91,5 @@ schema namespaces to locations, and the editor resolves and validates the whole 
 - `plugin/src/project-editor/ProjectEditor.tsx`
 - `plugin/src/core/project.ts`
 - `plugin/public/exo-manifest.json`
-- `docs/technical-decisions.md` TD-03, TD-16, TD-25, TD-26
+- `docs/technical-decisions.md` TD-03, TD-16, TD-25, TD-26, TD-32
 - `docs/scene-editor-ui.md`

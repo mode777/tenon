@@ -27,8 +27,9 @@ Purpose: the Exo-facing registration, format frames, shell panels, and scene pan
   then `complete()`. The inspection panel registers conditionally when the shell supports the
   bottom panel. (`plugin/src/controller.ts`)
 - **Editor frame:** `connectBrowserPlugin()` in editor mode; `readFile`, `setDirty`,
-  `onSaveRequest`, `onSaveResult`, `onFileChanged`, `onDispose`, `requestSave`,
-  `followTheme`. (`plugin/src/*/main.tsx`, `plugin/src/*Editor.tsx`)
+  `onSaveRequest`, `onSaveResult`, `onUndoRequest`, `onRedoRequest`, `onFileChanged`,
+  `onDispose`, `requestSave`, `followTheme`. (`plugin/src/*/main.tsx`,
+  `plugin/src/*Editor.tsx`)
 - **Panel frame:** `connectBrowserPlugin()` in view mode; `view.activeEditor`,
   `editor/active`, `subscribeLocal`/`publishLocal`, `readFile`/`listDirectory`,
   `requestPanel`. (`plugin/src/scene/panels/`)
@@ -47,6 +48,11 @@ Purpose: the Exo-facing registration, format frames, shell panels, and scene pan
 - **Save path.** `onSaveRequest` returns the open document's serialized text; the shell
   writes it. A save result updates the saved baseline; a conflict leaves the buffer and tab
   dirty. The frame never receives a file handle. (`plugin/src/*Editor.tsx`, TD-26)
+- **Undo/redo path.** Every frame owns a `useDocumentHistory` stack and uses
+  `useShellHistory` to apply Exo's id-less undo/redo intents to it. Frame controls and
+  Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z, and Ctrl/Cmd+Y cover a focused iframe; the shell path covers
+  the menu, palette, and hidden handlers. Read-only frames ignore intents and disable the
+  controls. (`plugin/src/core/history.ts`, `plugin/src/core/useShellHistory.ts`, TD-32)
 - **New files.** The project hub calls `requestNewFile` during a live command invocation,
   then `openFile`. The shell owns the dialog, path, and write. (`plugin/src/project/main.tsx`)
 - **Panel lifecycle.** Scene panels are singleton view frames. The scene/level editor binds
@@ -74,8 +80,8 @@ Purpose: the Exo-facing registration, format frames, shell panels, and scene pan
 
 ## Dependencies
 
-- **Uses:** Exo plugin SDK, browser DOM, React, three.js/R3F for the scene viewport, and the
-  core model.
+- **Uses:** Exo plugin SDK 1.11.0, browser DOM, React, three.js/R3F for the scene viewport,
+  and the core model.
 - **Used by:** the Exo shell; no other Tenon module.
 
 ## Decisions
@@ -86,5 +92,6 @@ Purpose: the Exo-facing registration, format frames, shell panels, and scene pan
 | Shell owns workspace, save, dirty, consent, and theme | Keeps the plugin untrusted and avoids duplicate chrome | TD-26 |
 | Scene Hierarchy & Assets/Inspector/Inspection are shell panels, not frame iframes | Frees viewport space and lets panels follow the active editor | TD-31 |
 | Panel edits are commands/intents to the editor | The editor remains the only writer and owns undo/conflict/save state | TD-31 |
+| Every frame owns its history; the shell only sends undo/redo intents | History stays with the document and buffer; older shells keep frame controls | TD-32 |
 | Primary panel for the project hub; primary/secondary/bottom for scene panels | Matches project-level vs document-level scope and Exo panel locations; the primary sidebar shows one view | TD-26, TD-31 |
 | Hierarchy & Assets and the library share one primary panel | The primary sidebar cannot show two views at once; the tree and library belong together | TD-31 |

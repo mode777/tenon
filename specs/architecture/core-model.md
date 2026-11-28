@@ -15,8 +15,8 @@ format editor. | Code: `plugin/src/core/`
   build readiness.
 - Derive scene surfaces, entity properties/events, slot attachments, and the flattened debug
   expansion of scene instances.
-- Provide workspace loading through a narrow SDK-facing client interface and per-document
-  undo/redo state.
+- Provide workspace loading through a narrow SDK-facing client interface and shared
+  per-document undo/redo state with selection snapshots.
 
 ## Interface
 
@@ -32,10 +32,11 @@ format editor. | Code: `plugin/src/core/`
 - **Workspace:** `loadWorkspace(client)` reads `project.json`, schema packages, scene
   packages, and `assets/`; returns typed issues when listing or parsing fails.
   (`plugin/src/core/workspace.ts`)
-- **History:** `useHistory(initial, clone)` provides frame-local snapshot undo/redo for the
-  project and scene editors; the schema editor keeps an equivalent local history in its own
-  frame. A document frame owns its history; no history is shared across frames.
-  (`plugin/src/core/history.ts`, `plugin/src/schema/SchemaEditor.tsx`)
+- **History:** `useDocumentHistory(initialDoc, initialSelection, clone)` provides frame-local
+  snapshot undo/redo over `{ doc, selection }` entries. It exposes `commit`, `replace`,
+  `select`, `updateSelection`, `reset`, `undo`, `redo`, `canUndo`, and `canRedo`; history is
+  bounded to 100 entries and coalesces same-key live edits. The project, schema, and scene
+  editors all use it. (`plugin/src/core/history.ts`)
 
 ## Relevant details
 
@@ -60,6 +61,11 @@ format editor. | Code: `plugin/src/core/`
 - **Unknown fields.** Parsers preserve unknown object keys via index signatures; the schema
   editor reports unsupported deferred field types rather than dropping them.
   (`plugin/src/core/schema.ts`, `docs/schema-editor-ui.md`)
+- **History boundaries.** Text and number fields commit on blur/Enter; one drag or discrete
+  command is one entry. Selection-only changes update the present snapshot without adding an
+  entry, so undo/redo restore the selection stored with the edit. Dirty is the saved-text
+  comparison; save keeps history and external reload clears it. (`plugin/src/core/history.ts`,
+  TD-32)
 - **Workspace boundary.** The core never receives a file handle or writes files. It reads via
   `readFile`/`listDirectory` and returns data/issues to a frame, which owns save and dirty
   state. (`plugin/src/core/workspace.ts`, TD-26)
@@ -76,6 +82,7 @@ format editor. | Code: `plugin/src/core/`
 | Decision | Why | Source |
 |---|---|---|
 | Keep parsing/validation pure and frame-agnostic | Editors share one rule set; tests cover the model without the shell | `plugin/src/core/*.test.ts` |
+| Shared snapshot history with document-plus-selection entries | One undo behavior for every format; selection restoration and future operations without inverse code | TD-32 |
 | Flatten composition before runtime; one origin per field | Avoid runtime inheritance and ambiguous defaults | TD-24 |
 | Keep scene instances atomic; surfaces and slots are the only boundary | Protect internals and make reuse safe | TD-07, TD-08, TD-10 |
 | Validate live and never block Save | Preserve incomplete authoring work | TD-16 |

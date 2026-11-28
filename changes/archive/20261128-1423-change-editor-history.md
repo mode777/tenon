@@ -1,6 +1,6 @@
 # Change: Unified editor undo/redo
 
-Status: done
+Status: synced
 Created: 2026-11-28
 
 ## 1. Proposal

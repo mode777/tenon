@@ -5,9 +5,11 @@
 - **Language/runtime:** TypeScript 5.9, browser ES modules, Node.js 22 in CI.
 - **UI:** React 19 with `react-dom`, Vite 8, Vitest 5, jsdom, and Testing Library.
 - **3D:** three.js 0.187 with `@react-three/fiber` 9 and `@react-three/drei` 10.
-- **Plugin SDK:** vendored `@exo/plugin-sdk` 1.10.0 in `../sdk/`; the plugin depends on the
+- **Plugin SDK:** vendored `@exo/plugin-sdk` 1.11.0 in `../sdk/`; the plugin depends on the
   exact same version. The SDK is copied from upstream and must stay unmodified.
-- **Host:** Exo editor shell. The plugin manifest declares `engines.exo: ">=0.11.0"`.
+- **Host:** Exo editor shell. The plugin manifest declares `engines.exo: ">=0.11.0"`. Shell
+  menu and palette Undo/Redo require Exo 0.13.0+; frame controls and shortcuts remain the
+  fallback.
 - **Data:** JSON authoring documents; no database. Workspace reads, listings, file creation,
   and saves go through the Exo SDK and shell.
 - **Hosting:** static GitHub Pages from `../plugin/dist`, deployed by
@@ -18,7 +20,7 @@
 
 - **Install:** `npm install`
 - **Dev server:** `npm run dev` — Vite on `http://localhost:5175`
-- **Test all:** `npm test` — runs the plugin Vitest suite (16 files, 117 tests at the time
+- **Test all:** `npm test` — runs the plugin Vitest suite (18 files, 148 tests at the time
   of this baseline)
 - **Test one:** from `plugin/`, `npx vitest run <test-file>`
 - **Typecheck:** `npm run typecheck` — `tsc --noEmit`
@@ -55,7 +57,9 @@ Evidence: Exo shell `docs/browser-support.md`
   (`M#`), and the UI concepts define intended behavior. Keep repeated rules in sync across
   those files and `README.md`.
 - **Per-document state.** Each open document is its own frame with its own buffer,
-  selection, undo/redo, and validation. Frames do not share mutable state.
+  selection, `useDocumentHistory` stack, and validation. History entries include selection.
+  Frames do not share mutable state; Exo undo/redo intents apply only to the active writable
+  frame.
 - **Validation is live.** Errors are visible but never block Save; incomplete authoring data
   can be saved. (`../docs/technical-decisions.md` TD-16)
 - **Ship gate.** Run `npm test`, `npm run typecheck`, and `npm run build` before shipping.

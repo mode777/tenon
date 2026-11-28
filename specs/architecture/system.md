@@ -27,6 +27,8 @@ runtime and build tooling stay outside the plugin.
 - The manifest declares `engines.exo: ">=0.11.0"` and requests only `workspace:read`,
   `workspace:write`, `workspace:list`, and `events:subscribe`.
   (`../plugin/public/exo-manifest.json`)
+- Shell menu and palette undo/redo require Exo 0.13.0+ and SDK 1.11.0; the frame controls and
+  shortcuts keep 0.11.0+ usable. (`../sdk/`, TD-32)
 - Format editors are per format, never per definition. (`../AGENTS.md`)
 - Validation is live in each frame and project-wide in the project editor. Errors never block
   Save. (`../docs/technical-decisions.md` TD-16)
@@ -39,7 +41,7 @@ runtime and build tooling stay outside the plugin.
 |---|---|---|---|
 | Exo shell (external) | Workspace, tabs, dirty state, save execution, consent, theme, panel layout, file dialogs, commands | — | Exo contract; `plugin/public/exo-manifest.json` |
 | Controller | Register file editors, panels, and commands; complete registration | SDK, manifest | `plugin/src/controller.ts` |
-| Core model | Parse and serialize schema/project/scene JSON; resolve imports; compose definitions; validate; derive scene surfaces and debug expansion; load workspace; per-document history | SDK types only at the workspace edge | `plugin/src/core/`, [core model](core-model.md) |
+| Core model | Parse and serialize schema/project/scene JSON; resolve imports; compose definitions; validate; derive scene surfaces and debug expansion; load workspace; shared per-document history | SDK types only at the workspace edge | `plugin/src/core/`, [core model](core-model.md) |
 | Project hub | List schemas/scenes/levels; New Schema and New Scene actions; open project settings | SDK view client, core templates | `plugin/src/project/` |
 | Project editor | Edit `project.json` import map; project-wide schema/scene validation; build readiness | Core project/schema/scene | `plugin/src/project-editor/` |
 | Schema editor | Author one schema bundle: identity, imports, definitions, composition, fields, enums, events, effective view, validation | Core schema | `plugin/src/schema/` |
@@ -54,9 +56,9 @@ runtime and build tooling stay outside the plugin.
 1. The Exo shell opens a matching file and mounts the declared frame editor.
 2. The frame connects with `connectBrowserPlugin()`, reads the open document through the SDK,
    and parses it with the core model.
-3. The editor holds the document in frame-local state and history. It derives validation,
-   effective definitions/surfaces, and library data from the document plus the read-only
-   workspace.
+3. The editor holds the document in the shared frame-local `useDocumentHistory`, whose entries
+   include the document and selection. It derives validation, effective definitions/surfaces,
+   and library data from the document plus the read-only workspace.
 4. When the shell requests Save, the frame returns only that document's serialized content.
    The shell performs the write and reports the result, including conflicts.
 5. Scene/level editors publish serialized snapshots on `local/tenon.scene` and apply typed
@@ -69,7 +71,9 @@ runtime and build tooling stay outside the plugin.
 ## Other concerns
 
 - **Per-document isolation.** Each open document has its own frame, buffer, selection,
-  undo/redo, and validation. No mutable state is shared between frames.
+  history, and validation. No mutable state is shared between frames. History entries capture
+  the document and selection; shell undo/redo intents apply to the active writable frame,
+  while the shell keeps no history or undo availability.
 - **Panel consistency.** The Hierarchy & Assets, Inspector, and Inspection panels receive
   `activeEditor`/`editor/active`, request a fresh snapshot on mount and when the active editor
   changes, and tolerate at-most-once local events. A panel shows an empty state when no Tenon
@@ -101,6 +105,7 @@ runtime and build tooling stay outside the plugin.
 | The plugin is one Exo plugin with per-format frame editors | One consent and shared schema/validation/UI | TD-26, TD-27 |
 | Scene Hierarchy & Assets/Inspector/Inspection are shell panels with a local snapshot/command bridge | Keeps panels shell-owned and the editor the only writer | TD-31 |
 | Hierarchy & Assets is a primary scene panel; the project hub remains the only project-level primary panel | Gives the tree/library a shell-owned home without consuming viewport width; one primary view is visible at a time | TD-31 |
+| Undo/redo is plugin-owned shared snapshot history; Exo sends id-less intents | Keeps history with the buffer and lets every format editor share one behavior | TD-32 |
 | Validation is live; Save is never refused for validation errors | Prevents data loss during incomplete authoring | TD-16 |
 
 ## Module architecture

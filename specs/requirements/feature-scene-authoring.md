@@ -169,5 +169,5 @@ panels follow the active scene/level editor.
 - `plugin/src/core/scene.ts`
 - `plugin/src/core/history.ts`
 - `docs/scene-editor-ui.md`
-- `docs/technical-decisions.md` TD-07, TD-16, TD-20, TD-21, TD-23, TD-30, TD-31
+- `docs/technical-decisions.md` TD-07, TD-16, TD-20, TD-21, TD-23, TD-30, TD-31, TD-32
 - `examples/m2-workspace/`
