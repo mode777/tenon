@@ -1,6 +1,6 @@
 # Change: Unified editor undo/redo
 
-Status: doing
+Status: done
 Created: 2026-11-28
 
 ## 1. Proposal
@@ -173,7 +173,7 @@ None.
   in one step — validate: history and editor tests.
 - [x] AC5 `HISTORY-SELECTION`: undo after delete/duplicate/create restores the associated
   selection; transient state is unchanged — validate: scene and schema editor tests.
-- [ ] AC6 `HISTORY-CONTROLS`: every frame shows disabled-state Undo/Redo controls and handles
+- [x] AC6 `HISTORY-CONTROLS`: every frame shows disabled-state Undo/Redo controls and handles
   all three shortcuts outside text inputs — validate: editor tests; manual keyboard check.
 - [x] AC7 `HISTORY-DIRTY`: undo to saved text clears dirty; redo marks dirty again — validate:
   editor tests asserting `setDirty` calls.
@@ -186,8 +186,12 @@ None.
   `npm run typecheck --workspace sdk`, and version assertions.
 - [x] AC12 Ship gate: `npm test`, `npm run typecheck`, and `npm run build` pass — validate:
   run all three from the repository root.
-- [ ] AC13 Shell integration: on Exo 0.13.0+, Edit > Undo/Redo and the palette change the
+- [x] AC13 Shell integration: on Exo 0.13.0+, Edit > Undo/Redo and the palette change the
   active Tenon document — validate: manual check in the hosted shell after deployment.
+  Verified on 2026-11-28 against deployed commit `2a90a20` at
+  <https://mode777.github.io/exo-editor/> with chrome-headless-shell 131: the schema bundle
+  ID changed, frame Ctrl+Z and Ctrl+Y reverted and reapplied it, Edit > Undo reverted it, and
+  the palette Redo reapplied it. No page or console errors.
 
 ## 7. Questions & Decisions
 
