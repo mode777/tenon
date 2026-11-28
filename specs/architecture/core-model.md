@@ -32,8 +32,10 @@ format editor. | Code: `plugin/src/core/`
 - **Workspace:** `loadWorkspace(client)` reads `project.json`, schema packages, scene
   packages, and `assets/`; returns typed issues when listing or parsing fails.
   (`plugin/src/core/workspace.ts`)
-- **History:** `useHistory(initial, clone)` provides frame-local undo/redo. A document frame
-  owns its history; no history is shared across frames. (`plugin/src/core/history.ts`)
+- **History:** `useHistory(initial, clone)` provides frame-local snapshot undo/redo for the
+  project and scene editors; the schema editor keeps an equivalent local history in its own
+  frame. A document frame owns its history; no history is shared across frames.
+  (`plugin/src/core/history.ts`, `plugin/src/schema/SchemaEditor.tsx`)
 
 ## Relevant details
 
